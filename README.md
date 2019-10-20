@@ -8,4 +8,6 @@ Start with:
 
 ![Demo](demo.PNG)
 
+For instant help just open menu item #12 and view some helpful informations.
+
 Support: *jan4995@gmail.com*
