@@ -1,0 +1,8 @@
+/mnt/e/Master/Skripte/RootReader/data
+/mnt/e/Master/Skripte/RootReader/runs
+0
+a
+a
+0
+1
+0
