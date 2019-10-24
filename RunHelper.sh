@@ -330,6 +330,8 @@ loadConfig() {
     #destdir=config.txt
     #$inFolder=$( sed -n '1 p' config.txt )
 
+        
+ if test -f "config.txt"; then
     inFolder=$(awk 'NR == 1' config.txt)
     outFolder=$(awk 'NR == 2' config.txt)
     readMode=$(awk 'NR == 3' config.txt)
@@ -340,6 +342,10 @@ loadConfig() {
     useCalibValues=$(awk 'NR == 8' config.txt)
 
     echo "config loaded!"
+    else
+     echo "config file not found! Save a config first!"
+  
+    fi 
 }
 
 start() {
@@ -405,7 +411,7 @@ inFolder=$here/data
 outFolder=$here/runs
 shouldCompile=true
 runMode="Full"
-runNumber=21
+runNumber=a
 readMode=0
 headerSize=a
 useExistingRunList=false
