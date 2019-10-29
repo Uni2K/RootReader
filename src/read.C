@@ -44,9 +44,9 @@
 float SP = 0.3125; // ns per bin
 float pe = 47.46;  //mV*ns
 vector<float> SiPM_shift = {2.679, 2.532, 3.594, 3.855, 3.354, 3.886, 3.865, 4.754}; // dummy
-vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};    // dummy
-vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
-vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
+vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};    // dummy
+vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
+vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
 
 int ch0PrintRate = 1000000;
 int trigPrintRate = 1000000;
@@ -83,10 +83,10 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = true;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 150; //Testbeam: 100, 125 charge, 100-150
-float integralEnd = 180;
-int triggerChannel = 9; //starting from 1 -> Calib: 9, Testbeam: 15
-int channelCount = 16;
+float integralStart = 165; //Testbeam: 100, 125 charge, 100-150
+float integralEnd =210;
+int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
+int channelCount =32;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_)
 {
@@ -192,9 +192,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   Int_t Second = -999;
   Int_t Millisecond = -999;
   Float_t trigT = -999; //t_trig = (t0+t1+t2+t3)/4
-  Float_t tPMT1 = -999;
-  Float_t tPMT2 = -999;
-  Float_t tPMT2i = -999;
   Float_t tSUMp = -999;
   Float_t tSUMm = -999;
   Float_t trigTp = -999; //t_trig' = [(t0+t1)-(t2+t3)]/4
@@ -329,23 +326,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("tSUMp", &tSUMp, "tSUMp/F");
   tree->Branch("tSUMm", &tSUMm, "tSUMm/F");
   tree->Branch("runNr", &runNr, "runNr/I");      //run number in google table
-  tree->Branch("horiz", &horizontal, "horiz/F"); //horizontal position of the box units: [cm]
-  tree->Branch("vert", &vertical, "vert/F");     //vertical position of the box, units: [cm]
   tree->Branch("angle", &angle, "angle/F");
   tree->Branch("pdgID", &pdgID, "pdgID/I");
   tree->Branch("energy", &energy, "energy/F");
-  tree->Branch("isSP", &isSP, "isSP/I");
   tree->Branch("mp", &mp, "mp/I");
   tree->Branch("safSiPM", &safSiPM, "safSiPM/I"); //solid angle factor
-  tree->Branch("trackL", &trackL, "trackL/I");    //track length
-  tree->Branch("isLastEvt", &isLastEvt, "isLastEvt/I");
-  tree->Branch("trigGate", &trigGate, "trigGate/F");
-  tree->Branch("trigTp", &trigTp, "trigTp/F");
-  tree->Branch("t0t1", &t0t1, "t0t1/F"); //t0t1 = [(t0-t1)]
-  tree->Branch("t2t3", &t2t3, "t2t3/F");
-  tree->Branch("isVeto", &isVeto, "isVeto/I");
-  tree->Branch("isTrig", &isTrig, "isTrig/I");
-  tree->Branch("isGoodSignal_5", &isGoodSignal_5, "isGoodSignal_5/I");
+
 
   // CHANNEL INFO (but everything that is nCH-dependend below)
   tree->Branch("nCh", &nCh, "nCh/I");
@@ -541,19 +527,19 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         if (i <= 7)
         {
-          WOMID[i] = 1;
+          WOMID[i] = 4;
         }
         else if (i <= 16)
         {
-          WOMID[i] = 2;
+          WOMID[i] = 3;
         }
         else if (i <= 24)
         {
-          WOMID[i] = 3;
+          WOMID[i] = 1;
         }
-        else if (i <= 32)
+        else if (i <= 31)
         {
-          WOMID[i] = 4;
+          WOMID[i] = 2;
         }
 
         TString title("");
@@ -575,7 +561,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         /*The error of each value in each bin is set to 0.5 mV.*/
         for (int j = 1; j <= hCh.GetXaxis()->GetNbins(); j++)
         {
-          hCh.SetBinError(j, 3);
+          hCh.SetBinError(j, 0.5);
         }
 
         /*Analysis if the event/signal starts.*/
@@ -702,6 +688,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         Additionally the number of p.e. is now calculated using the amplitude
         and the calibration factors in the calib_amp-vactor. The function 'PE' calculates the amplitude of the signal, subtracts the better BL value and divides by the calibration factor.
         */
+        
+
+
+       float t_amp=t_max_inRange(&hCh,integralStart,integralEnd);
+       integralStart=t_amp-10;
+       integralEnd=t_amp+15;
+
 
         Integral[i] = Integrate_50ns(&hCh, BL_shift) / calib_charge.at(i); // difined 50 ns window
 

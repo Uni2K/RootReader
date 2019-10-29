@@ -184,6 +184,14 @@ readFull() {
     headerSize=$4
     saveFolder=$outFolder/Full/
 
+
+    echo "$runNr"
+    echo "$2"
+    echo "$3"
+    echo "$4"
+    echo "$saveFolder"
+
+
     if [ "$runNr" = "a" ]; then
         readAll=true
     fi
