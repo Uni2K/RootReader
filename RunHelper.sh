@@ -72,7 +72,20 @@ parseRunList() {
     # get run number
     runNr=${fields[0]}
 
-    # get pdgID, beam energy
+    # get pdgID, beam energy 
+    #11_pos3_angle0_e26_ch32
+   # pos=$(echo ${fields[1]} | cut -c 4-)
+    pos=$(echo ${fields[1]} | cut -c 4-)
+    angle=$(echo ${fields[2]} | cut -c 6-)
+    energy=$(echo ${fields[3]} | cut -c 2-)
+    channel=$(echo ${fields[4]} | cut -c 3-)
+
+
+
+
+
+
+  : '
     runParticle=${fields[1]}
     case $runParticle in
     muon[6])
@@ -161,6 +174,9 @@ parseRunList() {
         line_to_runlsit="$runNr $dir_name $sideMP $pdgID $energy $angle $side_pos_x $side_pos_y"
         ;;
     esac
+'
+
+   line_to_runlsit="$runNr $dir_name $pos $angle $energy $channel"
 
     echo "$line_to_runlsit"
     echo "$line_to_runlsit" >>"$rl_file"
@@ -210,7 +226,8 @@ readFull() {
             fi
 
             #time $here/readFull $runDir/$runName.list $inFolder/$runName/ $runDir/out.root ${lineArr[0]} ${lineArr[2]} ${lineArr[3]} ${lineArr[4]} ${lineArr[5]} ${lineArr[6]}
-            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues"
+            echo " "
+            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}"
 
         fi
     done <./RootRunlist

@@ -53,14 +53,17 @@ int main(int argc, char *argv[])
   string useConstCalibValues_ = argv[8];
 
 
-  cout<<"TEST: "<<dynamicBL_<<isDC_<<useConstCalibValues_<<endl;
+  string runParameterJoined=string(argv[9])+ ',' +string(argv[11])+ ',' +string(argv[12])+ ',' +string(argv[13])+ ',' +string(argv[14]);
+
+
+
 
 
   // runNr=atoi(argv[4]);
   //WCVersion = "AB";
   //cout << WCVersion << endl;
 
-  read(inFileList, inDataFolder, outFile, runName, headerSize,dynamicBL_,isDC_,useConstCalibValues_);
+  read(inFileList, inDataFolder, outFile, runName, headerSize,dynamicBL_,isDC_,useConstCalibValues_,runParameterJoined);
   //}
   /* else if(argc == 10){
 

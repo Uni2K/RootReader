@@ -41,12 +41,11 @@
 #include "calib.h"
 #include "read.h"
 
-float SP = 0.3125; // ns per bin
-float pe = 47.46;  //mV*ns
-vector<float> SiPM_shift = {2.679, 2.532, 3.594, 3.855, 3.354, 3.886, 3.865, 4.754}; // dummy
-vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};    // dummy
-vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
-vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
+float SP = 0.3125;                                                                                                             // ns per bin
+float pe = 47.46;                                                                                                              //mV*ns
+vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};    // dummy
+vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
+vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
 
 int ch0PrintRate = 1000000;
 int trigPrintRate = 1000000;
@@ -84,12 +83,35 @@ bool isDC = true;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
 float integralStart = 165; //Testbeam: 100, 125 charge, 100-150
-float integralEnd =210;
+float integralEnd = 210;
 int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
-int channelCount =32;
+int channelCount = 32;
 
-void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_)
+void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
+
+  std::vector<std::string> runParams;
+  std::string token;
+  std::istringstream tokenStream(runParameter);
+  char split_char = ',';
+  while (std::getline(tokenStream, token, split_char))
+  {
+    runParams.push_back(token);
+  }
+
+  int runNr = stoi(runParams[0]);
+  int pos = stoi(runParams[1]);
+  int angle = stoi(runParams[2]);
+  int energy = stoi(runParams[3]);
+  int channel = stoi(runParams[4]);
+
+  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+  cout << "RunNr: " << runNr << endl;
+  cout << "Position: " << pos << endl;
+  cout << "Angle: " << angle << endl;
+  cout << "Energy: " << energy << endl;
+  cout << "Channel/WC: " << channel << endl;
+  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
 
   if (dynamicBL_ == "0")
   {
@@ -293,10 +315,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   //TString plotSaveFolder  = _inDataFolder;
   //plotSaveFolder.ReplaceAll("data","runs");
   TString plotSaveFolder = _outFile;
-  plotSaveFolder.ReplaceAll((runName+".root"), "");
+  plotSaveFolder.ReplaceAll((runName + ".root"), "");
+
+  //Math.top-channelCount.SquareRoot
 
   TCanvas cWaves("cWaves", "cWaves", 1000, 700);
-  cWaves.Divide(4, 4);
+  cWaves.Divide(channelCount / 4, 4);
   TCanvas cCh0("cCh0", "cCh0", 1500, 900);
   cCh0.Divide(2, 2);
   TCanvas cTrig("cTrig", "cTrig", 1500, 900);
@@ -325,13 +349,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("trigT", &trigT, "trigT/F");
   tree->Branch("tSUMp", &tSUMp, "tSUMp/F");
   tree->Branch("tSUMm", &tSUMm, "tSUMm/F");
-  tree->Branch("runNr", &runNr, "runNr/I");      //run number in google table
+  tree->Branch("runNr", &runNr, "runNr/I"); //run number in google table
   tree->Branch("angle", &angle, "angle/F");
   tree->Branch("pdgID", &pdgID, "pdgID/I");
   tree->Branch("energy", &energy, "energy/F");
   tree->Branch("mp", &mp, "mp/I");
   tree->Branch("safSiPM", &safSiPM, "safSiPM/I"); //solid angle factor
-
 
   // CHANNEL INFO (but everything that is nCH-dependend below)
   tree->Branch("nCh", &nCh, "nCh/I");
@@ -380,14 +403,22 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
+  std::ifstream countStream(_inFileList);
+  int numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
+                                  std::istreambuf_iterator<char>(), '\n');
+
+  cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
+
   int amp_array_PrintStatus = -1;
   int wavePrintStatus = -1;
   int ch0PrintStatus = -1;
   int trigPrintStatus = -1;
   int signalPrintStatus = -1;
-
+  int fileCounter = 0;
+  int currentPrint = -1;
   while (inList >> fileName)
   {
+    cout << "PRINT STATUS: FileCounter " << fileCounter << "currentPrint: " << currentPrint << endl;
 
     fileName = _inDataFolder + fileName;
     cout << endl;
@@ -424,11 +455,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           break;
         }
       }
-        if (headerSize > 328)
-    {
-      newerVersion = true;
-    }
-      cout << "VERSION: " << softwareVersion << " HEADERSIZE: " << headerSize <<"  Newer Version: "<<newerVersion <<endl;
+      if (headerSize > 328)
+      {
+        newerVersion = true;
+      }
+      cout << "VERSION: " << softwareVersion << " HEADERSIZE: " << headerSize << "  Newer Version: " << newerVersion << endl;
     }
 
     if (headerSize > 328)
@@ -688,13 +719,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         Additionally the number of p.e. is now calculated using the amplitude
         and the calibration factors in the calib_amp-vactor. The function 'PE' calculates the amplitude of the signal, subtracts the better BL value and divides by the calibration factor.
         */
-        
 
-
-       float t_amp=t_max_inRange(&hCh,integralStart,integralEnd);
-       integralStart=t_amp-10;
-       integralEnd=t_amp+15;
-
+        float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
+        integralStart = t_amp - 10;
+        integralEnd = t_amp + 15;
 
         Integral[i] = Integrate_50ns(&hCh, BL_shift) / calib_charge.at(i); // difined 50 ns window
 
@@ -730,9 +758,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         if (print)
         {
 
-          if (EventNumber % wavesPrintRate == 0)
+          //  if (EventNumber % wavesPrintRate == 0)
+          if (currentPrint != fileCounter)
           {
-            cWaves.cd(1 + 4 * (i % 4) + (i) / 4);
+            //  cWaves.cd(1 + 4 * (i % 6) + (i) / 6);
+            cWaves.cd(i + 1);
             hCh.DrawCopy();
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
             int max_bin = hCh.GetMaximumBin();
@@ -778,7 +808,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       __ TIMING _____
       */
       trigT = t[triggerChannel];
-      for (int i = 0; i <= 14; i++)
+      for (int i = 0; i <= channelCount - 1; i++)
       {
         tSiPM[i] = t[i] - trigT;
       }
@@ -787,28 +817,34 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
       if (print)
       {
-        for (int i = 0; i <= 15; i++)
+        for (int i = 0; i <= channelCount - 1; i++)
         {
           hChSum.at(i)->Add(&hChtemp.at(i), 1);
         }
       }
 
-
       if (print)
       {
         /*Saving the plotted signals/events to a new page in the .pdf file.*/
-        if (EventNumber % wavesPrintRate == 0)
+        if (currentPrint != fileCounter)
         {
-          if (wavePrintStatus < 0)
+          if (fileCounter == 0)
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
-            wavePrintStatus = 0;
+            C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
+            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
+            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
           }
           else
+          {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
+            C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
+            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
+            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
+          }
         }
-
-        if (EventNumber % trigPrintRate == 0)
+      }
+      /*if (EventNumber % trigPrintRate == 0)
         {
           if (trigPrintStatus < 0)
           {
@@ -829,7 +865,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
         }
       }
-      /*Writing the data for that event to the tree.*/
       if (EventNumber % amp_array_printRate == 0)
       {
         if (amp_array_PrintStatus < 0)
@@ -840,7 +875,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         else
           C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
       }
-
+*/
       /*Writing the data for that event to the tree.*/
       if (!skipThisEvent)
       {
@@ -850,12 +885,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
       // cout<<"SIZE OF: "<<sizeof(amp_array)<< endl;
       //tree->Print();
+      currentPrint = fileCounter;
     }
     auto nevent = tree->GetEntries();
 
     cout << "EVENTS:  " << nevent << endl;
     cout << "SKIPPED EVENTS:  " << skippedCount << endl;
     fclose(pFILE);
+    fileCounter++;
   }
 
   if (print)
@@ -864,10 +901,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     /*Clearing objects and saving files.*/
     inList.close();
     cWaves.Clear();
+
     cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
-    cCh0.Print((TString)(plotSaveFolder + "/ch0.pdf)"), "pdf");
-    cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
+    C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
     cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
+    cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
+
     for (int i = 0; i <= 15; i++)
     {
       cChSum.cd(i + 1);
