@@ -47,10 +47,14 @@ vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
 vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
 
-int ch0PrintRate = 1000000;
-int trigPrintRate = 1000000;
-int signalPrintRate = 100000;
 double coef = 2.5 / (4096 * 10);
+
+// Run Parameter
+Int_t runPosition = -999;
+Float_t runEnergy = -999;
+Int_t runAngle = -999;
+Int_t runNumber = -999;
+Int_t runChannelNumberWC = -999;
 
 extern int runNr;
 extern float horizontal;
@@ -65,9 +69,7 @@ extern int safPMT1;
 extern int safSiPM;
 extern int trackL;
 #define btoa(x) ((x) ? "true" : "false")
-
-int amp_array_printRate = 5000; //Changed down below
-int wavesPrintRate = 5000;
+int defaultErrorLevel=kError;
 bool print = true;
 int headerSize = 328;
 bool newerVersion = false;
@@ -89,8 +91,8 @@ int channelCount = 32;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
-
-  std::vector<std::string> runParams;
+ gErrorIgnoreLevel = defaultErrorLevel; 
+   std::vector<std::string> runParams;
   std::string token;
   std::istringstream tokenStream(runParameter);
   char split_char = ',';
@@ -99,19 +101,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     runParams.push_back(token);
   }
 
-  int runNr = stoi(runParams[0]);
-  int pos = stoi(runParams[1]);
-  int angle = stoi(runParams[2]);
-  int energy = stoi(runParams[3]);
-  int channel = stoi(runParams[4]);
-
-  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
-  cout << "RunNr: " << runNr << endl;
-  cout << "Position: " << pos << endl;
-  cout << "Angle: " << angle << endl;
-  cout << "Energy: " << energy << endl;
-  cout << "Channel/WC: " << channel << endl;
-  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+  // Run Parameter
+  int runNumber = stoi(runParams[0]);
+  int runPosition = stoi(runParams[1]);
+  int runAngle = stoi(runParams[2]);
+  float runEnergy = stoi(runParams[3]);
+  int runChannelNumberWC = stoi(runParams[4]);
 
   if (dynamicBL_ == "0")
   {
@@ -163,27 +158,23 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   if (!switch_BL)
     BL_const = readCalib(calib_path_bl, runName, 0);
 
-  if (isDC)
-  {
-    amp_array_printRate = 5000;
-    wavesPrintRate = 5000;
-  }
-  else
-  {
-    amp_array_printRate = 5000;
-    wavesPrintRate = 5000;
-  }
-
   cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+  cout << ":::::::::::::::::::RUN PARAMETER:::::::::::::::::::::::::::::::::::::::" << endl;
+  cout << "RunNr: " << runNumber << endl;
+  cout << "Position: " << runPosition << endl;
+  cout << "Angle: " << runAngle << endl;
+  cout << "Energy: " << runEnergy << endl;
+  cout << "Channel/WC: " << runChannelNumberWC << endl;
+  cout << ":::::::::::::::::::FILE PARAMETER::::::::::::::::::::::::::::::::::::::" << endl;
   cout << "RunName: " << runName << endl;
   cout << "headerSize Input: " << _headerSize << endl;
   cout << "InDataFolder: " << _inDataFolder.Data() << endl;
   cout << "OutFile: " << _outFile << endl;
-  if (!switch_BL)
-    printf(("USED BL ARRAY: %f,%f,%f,%f,%f,%f,%f,%f FOR: " + runName + "\n").c_str(), BL_const[0], BL_const[1], BL_const[2], BL_const[3], BL_const[4], BL_const[5], BL_const[6], BL_const[7], BL_const[8]);
-  printf(("USED AMP CALIB ARRAY: %f,%f,%f,%f,%f,%f,%f,%f FOR: " + runName + "\n").c_str(), calib_amp[0], calib_amp[1], calib_amp[2], calib_amp[3], calib_amp[4], calib_amp[5], calib_amp[6], calib_amp[7], calib_amp[8]);
-  printf(("USED CHARGE CALIB ARRAY: %f,%f,%f,%f,%f,%f,%f,%f FOR: " + runName + "\n").c_str(), calib_charge[0], calib_charge[1], calib_charge[2], calib_charge[3], calib_charge[4], calib_charge[5], calib_charge[6], calib_charge[7], calib_charge[8]);
-  printf("IS DARKCOUNT: %s | Dynamic Baseline: %s | Is Calibrated: %s ", btoa(isDC), btoa(switch_BL), btoa(isCalibrated));
+  cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
+  cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
+  cout << "Amplitude Calibration: " << vectorToString(calib_amp) << endl;
+  cout << "Charge Calibration: " << vectorToString(calib_charge) << endl;
+  cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(isCalibrated) << endl;
   cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
 
   /*Create root-file and root-tree for data*/
@@ -356,6 +347,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("mp", &mp, "mp/I");
   tree->Branch("safSiPM", &safSiPM, "safSiPM/I"); //solid angle factor
 
+  //RUN PARAMETER
+  tree->Branch("runPosition", &runPosition, "runPosition/I");
+  tree->Branch("runEnergy", &runEnergy, "runEnergy/F");
+  tree->Branch("runAngle", &runAngle, "runAngle/I");
+  tree->Branch("runNumber", &runNumber, "runNumber/I");
+  tree->Branch("runChannelNumberWC", &runChannelNumberWC, "runChannelNumberWC/I");
+
   // CHANNEL INFO (but everything that is nCH-dependend below)
   tree->Branch("nCh", &nCh, "nCh/I");
   tree->Branch("WOMID", WOMID, "WOMID[nCh]/I");
@@ -407,18 +405,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   int numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
                                   std::istreambuf_iterator<char>(), '\n');
 
-  cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
+  //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
 
-  int amp_array_PrintStatus = -1;
-  int wavePrintStatus = -1;
-  int ch0PrintStatus = -1;
-  int trigPrintStatus = -1;
-  int signalPrintStatus = -1;
   int fileCounter = 0;
   int currentPrint = -1;
   while (inList >> fileName)
   {
-    cout << "PRINT STATUS: FileCounter " << fileCounter << "currentPrint: " << currentPrint << endl;
 
     fileName = _inDataFolder + fileName;
     cout << endl;
@@ -679,7 +671,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         TPolyMarker pm;       // store polymarker showing peak position, print later
         peakfinder(&hCh, 0, 130, nPeaks, sigma, thrPF, peakX[i], peakY[i], &pm, pfON);
 
-        gErrorIgnoreLevel = kUnset; // return to normal terminal output
+        gErrorIgnoreLevel =defaultErrorLevel; // return to normal terminal output
 
         // baseline-correct Y-values and convert to units of p.e.
         if (pfON)
@@ -844,38 +836,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
       }
-      /*if (EventNumber % trigPrintRate == 0)
-        {
-          if (trigPrintStatus < 0)
-          {
-            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
-            trigPrintStatus = 0;
-          }
-          else
-            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
-        }
-        if (EventNumber % signalPrintRate == 0)
-        {
-          if (signalPrintStatus < 0)
-          {
-            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
-            signalPrintStatus = 0;
-          }
-          else
-            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
-        }
-      }
-      if (EventNumber % amp_array_printRate == 0)
-      {
-        if (amp_array_PrintStatus < 0)
-        {
-          C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
-          amp_array_PrintStatus = 0;
-        }
-        else
-          C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
-      }
-*/
+
       /*Writing the data for that event to the tree.*/
       if (!skipThisEvent)
       {

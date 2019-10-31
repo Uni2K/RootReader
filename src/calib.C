@@ -12,7 +12,7 @@
 #include <vector>
 #include <assert.h>
 #include <stdio.h>
-
+#include <sstream>
 //specific
 #include "calib.h"
 
@@ -29,6 +29,25 @@ double stringToDouble(string text)
 {
   return stod(text);
 }
+
+string vectorToString(vector<float> vec){
+ std::ostringstream vts; 
+  
+  if (!vec.empty()) 
+  { 
+    // Convert all but the last element to avoid a trailing "," 
+    std::copy(vec.begin(), vec.end()-1, 
+        std::ostream_iterator<int>(vts, ", ")); 
+  
+    // Now add the last element with no delimiter 
+    vts << vec.back(); 
+  } 
+  return vts.str();
+
+}
+
+
+
 
 /******** FUNCTIONS ********/
 vector<float> readCalib(string calib_path, string _runName, double initValue)
