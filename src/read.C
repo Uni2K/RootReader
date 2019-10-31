@@ -84,8 +84,8 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = true;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 165; //Testbeam: 100, 125 charge, 100-150
-float integralEnd = 210;
+float integralStart = 100; //Testbeam: 100, 125 charge, 100-150
+float integralEnd = 150;
 int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
 int channelCount = 32;
 
