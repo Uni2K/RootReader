@@ -69,7 +69,7 @@ extern int safPMT1;
 extern int safSiPM;
 extern int trackL;
 #define btoa(x) ((x) ? "true" : "false")
-int defaultErrorLevel=kError;
+int defaultErrorLevel = kError;
 bool print = true;
 int headerSize = 328;
 bool newerVersion = false;
@@ -91,8 +91,8 @@ int channelCount = 32;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
- gErrorIgnoreLevel = defaultErrorLevel; 
-   std::vector<std::string> runParams;
+  gErrorIgnoreLevel = defaultErrorLevel;
+  std::vector<std::string> runParams;
   std::string token;
   std::istringstream tokenStream(runParameter);
   char split_char = ',';
@@ -101,12 +101,25 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     runParams.push_back(token);
   }
 
+  int runNumber = 0;
+  int runPosition = 0;
+  int runAngle = 0;
+  float runEnergy = 0;
+  int runChannelNumberWC = 0;
+
   // Run Parameter
-  int runNumber = stoi(runParams[0]);
-  int runPosition = stoi(runParams[1]);
-  int runAngle = stoi(runParams[2]);
-  float runEnergy = stoi(runParams[3]);
-  int runChannelNumberWC = stoi(runParams[4]);
+  try
+  {
+    runNumber = stoi(runParams[0]);
+    runPosition = stoi(runParams[1]);
+    runAngle = stoi(runParams[2]);
+    runEnergy = stoi(runParams[3]);
+    runChannelNumberWC = stoi(runParams[4]);
+  }
+  catch (const std::exception &e)
+  {
+    std::cerr << e.what() << '\n';
+  }
 
   if (dynamicBL_ == "0")
   {
@@ -671,7 +684,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         TPolyMarker pm;       // store polymarker showing peak position, print later
         peakfinder(&hCh, 0, 130, nPeaks, sigma, thrPF, peakX[i], peakY[i], &pm, pfON);
 
-        gErrorIgnoreLevel =defaultErrorLevel; // return to normal terminal output
+        gErrorIgnoreLevel = defaultErrorLevel; // return to normal terminal output
 
         // baseline-correct Y-values and convert to units of p.e.
         if (pfON)
@@ -850,7 +863,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     }
     auto nevent = tree->GetEntries();
 
-    cout << "Events:  " << nevent << "Skipped:  "<<skippedCount<< endl;
+    cout << "Events:  " << nevent << "Skipped:  " << skippedCount << endl;
     fclose(pFILE);
     fileCounter++;
   }
