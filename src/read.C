@@ -88,6 +88,11 @@ float integralStart = 100; //Testbeam: 100, 125 charge, 100-150
 float integralEnd = 150;
 int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
 int channelCount = 32;
+int printExtraEvents=20;
+int printedExtraEvents=0;
+
+bool skipExceedingEvents=true; //WC can only handle Events with a maximum high around 700mV
+int exceedingThreshold=650;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
@@ -503,7 +508,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
     while (nitem > 0)
     { //event loop
-
+    skipThisEvent = false;
       std::vector<TObject *> eventTrash;
       whileCounter++;
       nitem = fread(&EventNumber, sizeof(int), 1, pFILE);
@@ -607,6 +612,19 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         /*Saving the histogram of that event into a temporary histogram hChtemp. These histograms are available outside of the channel-loop. If analysis using the signals/events of multiple channels needs to be done, this can be accomplished by using hChtemp after the channel-loop.*/
         hChtemp.at(i) = hCh;
 
+
+
+        //Exceeding Events Skipping
+        if(skipExceedingEvents && !skipThisEvent){
+        if(max[i]>exceedingThreshold){
+         // cout << "EXCEEDING: " << max[i]  <<" CHANNEL: " <<i << endl;
+        skipThisEvent = true;
+        }else{
+         skipThisEvent =false;
+        }
+        }
+
+
         /*
         __ Baseline Fit _______________________________________________________
         Calculate baseline values infront and after the triggered signal
@@ -645,7 +663,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           if (BL_Chi2_used[i] > 1)
           {
             skipThisEvent = true;
-            skippedCount = skippedCount + 1;
           }
           else
           {
@@ -755,6 +772,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         else
           amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_shift, integralStart, integralEnd);
 
+
+
+  	    
+
         /*
         __ Printing Wafevorms ____________________________________________
         The signals for events can be printed to a .pdf file called waves.pdf. The rate at which the events are drawn to waves.pdf is set via the variable wavesPrintRate. Additional requirements can be set in the if-statement to look at specific events only.
@@ -764,8 +785,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
 
           //  if (EventNumber % wavesPrintRate == 0)
-          if (currentPrint != fileCounter)
+          if ((currentPrint != fileCounter) || (printedExtraEvents 	< printExtraEvents))
           {
+             // cout << "PRINT:" <<i <<" COUNT:"<<printedExtraEvents  <<endl;
+
             //  cWaves.cd(1 + 4 * (i % 6) + (i) / 6);
             cWaves.cd(i + 1);
             hCh.DrawCopy();
@@ -820,7 +843,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
       // add-up all events channel-wise, not calibrated
 
-      if (print)
+      if (!skipThisEvent && print)
       {
         for (int i = 0; i <= channelCount - 1; i++)
         {
@@ -828,11 +851,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         }
       }
 
-      if (print)
+      if (!skipThisEvent && print)
       {
         /*Saving the plotted signals/events to a new page in the .pdf file.*/
-        if (currentPrint != fileCounter)
+          if ((currentPrint != fileCounter) || (printedExtraEvents  	< printExtraEvents))
         {
+                printedExtraEvents++;
+
           if (fileCounter == 0)
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
@@ -853,7 +878,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       /*Writing the data for that event to the tree.*/
       if (!skipThisEvent)
       {
+       //   cout << "NOT SKIIPEd: " << endl;
         tree->Fill();
+      }else{
+                skippedCount = skippedCount + 1;
+
       }
       // cout<<"BASELINE: "<<skipThisEvent<<"     "<< skippedCount<<endl;
 
@@ -863,7 +892,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     }
     auto nevent = tree->GetEntries();
 
-    cout << "Events:  " << nevent << "Skipped:  " << skippedCount << endl;
+    cout << "Events:  " << nevent << " Skipped:  " << skippedCount << endl;
     fclose(pFILE);
     fileCounter++;
   }
