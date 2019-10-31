@@ -28,6 +28,7 @@ checkDependencies() {
     PKG_OK=$(dpkg-query -W --showformat='${Status}\n' zenity | grep "ok installed")
     if [ "" == "$PKG_OK" ]; then
         echo Please enter the sudo password to install Zenity
+
         sudo apt-get install zenity
     else
         echo "Zenity is installed! "
@@ -43,11 +44,13 @@ checkDependencies() {
 }
 
 chooseOutFolder() {
+    checkDependencies
     outFolder=$(zenity --file-selection --directory --title "Select outpu Folder (.bin Files)?")
-    echo $outFolder
+   #  echo $outFolder
 }
 
 chooseInFolder() {
+    checkDependencies
     inFolder=$(zenity --file-selection --directory --title "Select input Folder (.bin Files)?")
 }
 
@@ -421,7 +424,7 @@ start() {
 # ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
 
 showInformation
-checkDependencies
+
 here=$(pwd)
 src=$here/src/
 inFolder=$here/data
