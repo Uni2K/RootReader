@@ -63,7 +63,7 @@ createInAndOutFolder() {
 parseRunList() {
     dir_name=$0
     rl_file=$1
-
+    nameSchema=$2
     # construct array. contains the elements separated by "_" delimiter in $dir_name
     IFS="_" read -r -a fields <<<"$dir_name"
 
@@ -71,114 +71,112 @@ parseRunList() {
 
     # get run number
     runNr=${fields[0]}
+    if [ "$nameSchema" == "2019" ]; then
 
-    # get pdgID, beam energy 
-    #11_pos3_angle0_e26_ch32
-   # pos=$(echo ${fields[1]} | cut -c 4-)
-    pos=$(echo ${fields[1]} | cut -c 4-)
-    angle=$(echo ${fields[2]} | cut -c 6-)
-    energy=$(echo ${fields[3]} | cut -c 2-)
-    channel=$(echo ${fields[4]} | cut -c 3-)
+        # get pdgID, beam energy
+        #11_pos3_angle0_e26_ch32
+        # pos=$(echo ${fields[1]} | cut -c 4-)
+        pos=$(echo ${fields[1]} | cut -c 4-)
+        angle=$(echo ${fields[2]} | cut -c 6-)
+        energy=$(echo ${fields[3]} | cut -c 2-)
+        channel=$(echo ${fields[4]} | cut -c 3-)
+        echo "Runlist (2019) creating..."
+        line_to_runlsit="$runNr $dir_name $pos $angle $energy $channel"
 
+    else
 
-
-
-
-
-  : '
-    runParticle=${fields[1]}
-    case $runParticle in
-    muon[6])
-        pdgID="-13"
-        energy="6"
-        ;;
-    pion[1-6])
-        pdgID="211"
-        energy=$(echo $runParticle | cut -c 5)
-        ;;
-    e5)
-        pdgID="-11"
-        energy=5
-        ;;
-    *)
-        echo "UNKNOWN particle description in run $runNr"
-        ;;
-    esac
-
-    # get measurement position
-    runMP=${fields[2]}
-    case $runMP in
-    pos[0-9] | pos[1][0-9]) # 0°/30° measurements, no xy-coordinates
-        frontMP=$(echo $runMP | cut -c 4-)
-        ;;
-    scanBD) # 90° WOM scans, hardcoded $sideMP
-        side_pos_x=${fields[3]}
-        side_pos_y=${fields[4]}
-        case $side_pos_y in
-        0)
-            case $side_pos_x in
-            0) sideMP=18 ;; 6) sideMP=19 ;; 12) sideMP=20 ;; 18) sideMP=21 ;; 24) sideMP=22 ;;
-            esac
+        runParticle=${fields[1]}
+        case $runParticle in
+        muon[6])
+            pdgID="-13"
+            energy="6"
             ;;
-        1)
-            case $side_pos_x in
-            0) sideMP=23 ;; 6) sideMP=24 ;; 12) sideMP=25 ;; 18) sideMP=26 ;; 24) sideMP=27 ;;
-            esac
+        pion[1-6])
+            pdgID="211"
+            energy=$(echo $runParticle | cut -c 5)
             ;;
-        2)
-            case $side_pos_x in
-            0) sideMP=28 ;; 6) sideMP=29 ;; 12) sideMP=30 ;; 18) sideMP=31 ;; 24) sideMP=32 ;;
-            esac
+        e5)
+            pdgID="-11"
+            energy=5
             ;;
-        3)
-            case $side_pos_x in
-            0) sideMP=33 ;; 6) sideMP=34 ;; 12) sideMP=35 ;; 18) sideMP=36 ;; 24) sideMP=37 ;;
-            esac
+        *)
+            echo "UNKNOWN particle description in run $runNr"
             ;;
         esac
-        ;;
-    *)
-        echo "UNKNOWN position description in run $runNr"
-        ;;
-    esac
 
-    # get angle
-    case $nfields in
-    3)
-        angle="0"
-        ;;
-    4)
-        angle="0"
-        ;;
-    5)
-        angle=$(echo "${fields[3]}" | cut -c 6-)
-        ;;
-    7)
-        angle=$(echo "${fields[5]}" | cut -c 6-)
-        ;;
-    *)
-        echo "UNKNOWN angele description in run $runNr"
-        ;;
+        # get measurement position
+        runMP=${fields[2]}
+        case $runMP in
+        pos[0-9] | pos[1][0-9]) # 0°/30° measurements, no xy-coordinates
+            frontMP=$(echo $runMP | cut -c 4-)
+            ;;
+        scanBD) # 90° WOM scans, hardcoded $sideMP
+            side_pos_x=${fields[3]}
+            side_pos_y=${fields[4]}
+            case $side_pos_y in
+            0)
+                case $side_pos_x in
+                0) sideMP=18 ;; 6) sideMP=19 ;; 12) sideMP=20 ;; 18) sideMP=21 ;; 24) sideMP=22 ;;
+                esac
+                ;;
+            1)
+                case $side_pos_x in
+                0) sideMP=23 ;; 6) sideMP=24 ;; 12) sideMP=25 ;; 18) sideMP=26 ;; 24) sideMP=27 ;;
+                esac
+                ;;
+            2)
+                case $side_pos_x in
+                0) sideMP=28 ;; 6) sideMP=29 ;; 12) sideMP=30 ;; 18) sideMP=31 ;; 24) sideMP=32 ;;
+                esac
+                ;;
+            3)
+                case $side_pos_x in
+                0) sideMP=33 ;; 6) sideMP=34 ;; 12) sideMP=35 ;; 18) sideMP=36 ;; 24) sideMP=37 ;;
+                esac
+                ;;
+            esac
+            ;;
+        *)
+            echo "UNKNOWN position description in run $runNr"
+            ;;
+        esac
 
-    esac
+        # get angle
+        case $nfields in
+        3)
+            angle="0"
+            ;;
+        4)
+            angle="0"
+            ;;
+        5)
+            angle=$(echo "${fields[3]}" | cut -c 6-)
+            ;;
+        7)
+            angle=$(echo "${fields[5]}" | cut -c 6-)
+            ;;
+        *)
+            echo "UNKNOWN angele description in run $runNr"
+            ;;
 
-    ######################
-    ## PRINT TO RUNLIST ##
-    ######################
-    # line_to_runlsit
-    case $nfields in
-    [3-5])
-        line_to_runlsit="$runNr $dir_name $frontMP $pdgID $energy $angle"
-        ;;
-    7)
-        line_to_runlsit="$runNr $dir_name $sideMP $pdgID $energy $angle $side_pos_x $side_pos_y"
-        ;;
-    esac
-'
+        esac
 
-   line_to_runlsit="$runNr $dir_name $pos $angle $energy $channel"
+        ######################
+        ## PRINT TO RUNLIST ##
+        ######################
+        # line_to_runlsit
+        case $nfields in
+        [3-5])
+            line_to_runlsit="$runNr $dir_name $frontMP $pdgID $energy $angle"
+            ;;
+        7)
+            line_to_runlsit="$runNr $dir_name $sideMP $pdgID $energy $angle $side_pos_x $side_pos_y"
+            ;;
+        esac
+        echo "Runlist (2018) creating..."
+    fi
 
-    echo "$line_to_runlsit"
+    #echo "$line_to_runlsit"
     echo "$line_to_runlsit" >>"$rl_file"
 
 }
@@ -200,19 +198,16 @@ readFull() {
     headerSize=$4
     saveFolder=$outFolder/Full/
 
-
     echo "$runNr"
     echo "$2"
     echo "$3"
     echo "$4"
     echo "$saveFolder"
 
-
     if [ "$runNr" = "a" ]; then
         readAll=true
     fi
     mkdir "$saveFolder"
-
 
     while read line; do
         [[ $line == \#* ]] && continue
@@ -305,8 +300,6 @@ readFast() {
                 rm -rf $runDir/*/
                 find $runDir -name "*.list" -type f -delete
 
-
-
             fi
 
         done \
@@ -355,22 +348,21 @@ loadConfig() {
     #destdir=config.txt
     #$inFolder=$( sed -n '1 p' config.txt )
 
-        
- if test -f "config.txt"; then
-    inFolder=$(awk 'NR == 1' config.txt)
-    outFolder=$(awk 'NR == 2' config.txt)
-    readMode=$(awk 'NR == 3' config.txt)
-    runNumber=$(awk 'NR == 4' config.txt)
-    headerSize=$(awk 'NR == 5' config.txt)
-    isDC=$(awk 'NR == 6' config.txt)
-    dynamicBL=$(awk 'NR == 7' config.txt)
-    useCalibValues=$(awk 'NR == 8' config.txt)
+    if test -f "config.txt"; then
+        inFolder=$(awk 'NR == 1' config.txt)
+        outFolder=$(awk 'NR == 2' config.txt)
+        readMode=$(awk 'NR == 3' config.txt)
+        runNumber=$(awk 'NR == 4' config.txt)
+        headerSize=$(awk 'NR == 5' config.txt)
+        isDC=$(awk 'NR == 6' config.txt)
+        dynamicBL=$(awk 'NR == 7' config.txt)
+        useCalibValues=$(awk 'NR == 8' config.txt)
 
-    echo "config loaded!"
+        echo "config loaded!"
     else
-     echo "config file not found! Save a config first!"
-  
-    fi 
+        echo "config file not found! Save a config first!"
+
+    fi
 }
 
 start() {
@@ -400,7 +392,7 @@ start() {
         export -f parseRunList
         runlist="RootRunlist"
         rm "$runlist"
-        ls $inFolder | sort -n | xargs -n 1 bash -c "parseRunList $runlist"
+        ls $inFolder | sort -n | xargs -n 1 bash -c "parseRunList $runlist $nameSchema" 
 
         #Check if readList exists
         if [ -f $runList ]; then
@@ -430,7 +422,7 @@ start() {
 
 showInformation
 checkDependencies
-here=$(pwd) 
+here=$(pwd)
 src=$here/src/
 inFolder=$here/data
 outFolder=$here/runs
@@ -443,6 +435,7 @@ useExistingRunList=false
 useCalibValues="0"
 dynamicBL="1"
 isDC="0"
+nameSchema="2019"
 
 echo "-------------------------------------------------------"
 
@@ -453,10 +446,17 @@ while true; do
     echo "-------------------------------------------------------"
     echo "-------------------------------------------------------"
 
-    select yn in "Start" "RunMode ($runMode)" "RunNumber ($runNumber)" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "Load Config" "Save Config" "Informations"; do
+    select yn in "Start" "RunMode ($runMode)" "RunNumber ($runNumber)" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Load Config" "Save Config" "Informations"; do
         case $yn in
 
-        "Start")
+        "RunList Naming Schema ($nameSchema)")
+            echo "Enter Name Schema ($nameSchema)"
+            read nameSchema
+            break
+            ;;
+
+        \
+            "Start")
             printf "\033c" #Clean Screen
             start
             break 2

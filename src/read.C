@@ -850,8 +850,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     }
     auto nevent = tree->GetEntries();
 
-    cout << "EVENTS:  " << nevent << endl;
-    cout << "SKIPPED EVENTS:  " << skippedCount << endl;
+    cout << "Events:  " << nevent << "Skipped:  "<<skippedCount<< endl;
     fclose(pFILE);
     fileCounter++;
   }
