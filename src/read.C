@@ -726,11 +726,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         */
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
-        integralStart = t_amp - 10;
-        integralEnd = t_amp + 15;
+       float integralStartShifted = t_amp - 10;
+       float integralEndShifted = t_amp + 15;
 
         Integral[i] = Integrate_50ns(&hCh, BL_shift) / calib_charge.at(i); // difined 50 ns window
-
+        
         //TESTBEAM
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
         // calibrated, BL-shifted amplitude at maximum in window
@@ -742,7 +742,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         if (isDC)
           Integral_inRange[i] = integral(&hCh, 50, 75, BL_shift) / calib_charge.at(i); // for DC runs
         else
-          Integral_inRange[i] = integral(&hCh, integralStart, integralEnd, BL_shift) / calib_charge.at(i);
+          Integral_inRange[i] = integral(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
 
         // calibrated, BL-shifted amplitude at maximum in window
         if (isDC)
