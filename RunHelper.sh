@@ -83,7 +83,7 @@ parseRunList() {
         angle=$(echo ${fields[2]} | cut -c 6-)
         energy=$(echo ${fields[3]} | cut -c 2-)
         channel=$(echo ${fields[4]} | cut -c 3-)
-        echo "Runlist (2019) creating..."
+      #  echo "Runlist (2019) creating..."
         line_to_runlsit="$runNr $dir_name $pos $angle $energy $channel"
 
     else
@@ -215,6 +215,8 @@ readFull() {
     while read line; do
         [[ $line == \#* ]] && continue
         lineArr=($line)
+         echo "$lineArr"
+
         if [ "${lineArr[0]}" = "$runNr" ] || [ $readAll = true ]; then
             runName=${lineArr[1]}
             runDir=$saveFolder/$runName
@@ -224,11 +226,11 @@ readFull() {
             fi
 
             #time $here/readFull $runDir/$runName.list $inFolder/$runName/ $runDir/out.root ${lineArr[0]} ${lineArr[2]} ${lineArr[3]} ${lineArr[4]} ${lineArr[5]} ${lineArr[6]}
-            echo " "
+            echo " RUN "
             time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}"
 
         fi
-    done <./RootRunlist
+    done <./RootRunlist.txt
 
 }
 
@@ -306,7 +308,7 @@ readFast() {
             fi
 
         done \
-            <./RootRunlist
+            <./RootRunlist.txt
 
         #reads lines of "runslist"
 
@@ -391,11 +393,11 @@ start() {
     createInAndOutFolder $inFolder $outFolder
 
     if [ "$useExistingRunList" = false ]; then
-        echo "Creating a runlist for all input folder Files... (Name: RootRunlist)"
+        echo "Creating a runlist for all input folder Files... (Name: RootRunlist.txt)"
         export -f parseRunList
-        runlist="RootRunlist"
+        runlist="RootRunlist.txt"
         rm "$runlist"
-        ls $inFolder | sort -n | xargs -n 1 bash -c "parseRunList $runlist $nameSchema" 
+        ls $inFolder | sort -n | xargs -n 1 -P 1 bash -c "parseRunList $runlist $nameSchema" 
 
         #Check if readList exists
         if [ -f $runList ]; then
@@ -439,6 +441,10 @@ useCalibValues="0"
 dynamicBL="1"
 isDC="0"
 nameSchema="2019"
+
+
+
+
 
 echo "-------------------------------------------------------"
 
@@ -595,3 +601,4 @@ done
 
 # sudo apt-get install zenity
 #FILE=$(dialog --title "Delete a file" --stdout --title "Please choose a file to delete" --fselect /tmp/ 14 48)
+ 

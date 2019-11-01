@@ -31,9 +31,6 @@
 #include <vector>
 #include <stdlib.h>
 #include <sstream>
-//#include <stdlib.h>
-//#include <string>
-//#include <iomanip>
 
 //specific
 #include "geometry.h"
@@ -54,30 +51,31 @@ Int_t runPosition = -999;
 Float_t runEnergy = -999;
 Int_t runAngle = -999;
 Int_t runNumber = -999;
-Int_t runChannelNumberWC = -999;
+Int_t runChannelNumberWC = 32;
+/*Declare & define the variables that are to be saved in the root-tree or that are used during the analysis.*/
+Int_t EventNumber = -999;
+Int_t LastEventNumber = -999;
+unsigned long long int TDCsamIndex;
+Float_t SamplingPeriod = -999;
+Double_t EpochTime = -999;
+Int_t Year = -999;
+Int_t Month = -999;
+Int_t Day = -999;
+Int_t Hour = -999;
+Int_t Minute = -999;
+Int_t Second = -999;
+Int_t Millisecond = -999;
+Float_t trigT = -999; //t_trig = (t0+t1+t2+t3)/4
+Float_t tSUMp = -999;
+Float_t tSUMm = -999;
+Int_t nCh = -1;
+int nActiveCh = -1;
 
-extern int runNr;
-extern float horizontal;
-extern float vertical;
-extern float angle;
-extern int pdgID;
-extern float energy;
-extern int isSP;
-extern int mp;
-extern int safPMT2;
-extern int safPMT1;
-extern int safSiPM;
-extern int trackL;
 #define btoa(x) ((x) ? "true" : "false")
 int defaultErrorLevel = kError;
 bool print = true;
 int headerSize = 328;
 bool newerVersion = false;
-//Skip events with bad baseline
-bool allowEventSkipping = false;
-bool skipThisEvent = false;
-int skippedCount = 0;
-int skipInChannel = 0;
 // SWITCH dynamic <-> constant baseline
 bool switch_BL = false; // true = dyn, false = const
 //Integration Window
@@ -87,12 +85,19 @@ bool isCalibrated = true;
 float integralStart = 100; //Testbeam: 100, 125 charge, 100-150
 float integralEnd = 150;
 int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
-int channelCount = 32;
-int printExtraEvents=20;
-int printedExtraEvents=0;
+int plotGrid=5;
+int printExtraEvents = 0;
+int printedExtraEvents = 0;
 
-bool skipExceedingEvents=true; //WC can only handle Events with a maximum high around 700mV
-int exceedingThreshold=650;
+//Event Skipping
+bool skipThisEvent = false;
+int skippedCount = 0;
+//Skip events with bad baseline
+bool allowBaselineEventSkipping = false;
+int skipInChannel = 0;
+//Skip events that exceed the WC maximum
+bool allowExceedingEventSkipping = true;
+int exceedingThreshold = 650;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
@@ -106,12 +111,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     runParams.push_back(token);
   }
 
-  int runNumber = 0;
-  int runPosition = 0;
-  int runAngle = 0;
-  float runEnergy = 0;
-  int runChannelNumberWC = 0;
-
   // Run Parameter
   try
   {
@@ -120,11 +119,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     runAngle = stoi(runParams[2]);
     runEnergy = stoi(runParams[3]);
     runChannelNumberWC = stoi(runParams[4]);
+    
   }
   catch (const std::exception &e)
   {
     std::cerr << e.what() << '\n';
   }
+  plotGrid=ceil(sqrt(runChannelNumberWC));
 
   if (dynamicBL_ == "0")
   {
@@ -206,86 +207,59 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   }
   TTree *tree = new TTree("T", "USBWC Data Tree");
   TTree::SetBranchStyle(0);
-
   gStyle->SetLineScalePS(1); // export high resolution plots
 
-  /*Declare & define the variables that are to be saved in the root-tree or that are used during the analysis.*/
-  Int_t EventNumber = -999;
-  Int_t LastEventNumber = -999;
-  unsigned long long int TDCsamIndex;
-  Float_t SamplingPeriod = -999;
-  Double_t EpochTime = -999;
-  Int_t Year = -999;
-  Int_t Month = -999;
-  Int_t Day = -999;
-  Int_t Hour = -999;
-  Int_t Minute = -999;
-  Int_t Second = -999;
-  Int_t Millisecond = -999;
-  Float_t trigT = -999; //t_trig = (t0+t1+t2+t3)/4
-  Float_t tSUMp = -999;
-  Float_t tSUMm = -999;
-  Float_t trigTp = -999; //t_trig' = [(t0+t1)-(t2+t3)]/4
-  Float_t t0t1 = -999;   //t0t1 = [(t0-t1)]
-  Float_t t2t3 = -999;   //t2t3 = [(t2-t3)]
-  Int_t isVeto = -999;   //variable to define veto, 1 if veto, 0 if not, -999 if undefined
-  Int_t isTrig = -999;
-  Int_t isLastEvt = -999;
-  Int_t isGoodSignal_5 = -999;
-  Float_t trigGate = -999;
-  Int_t nCh = -1;
-  int nActiveCh = -1;
-  Int_t ChannelNr[channelCount];
-  Int_t WOMID[channelCount]; //1=A, 2=B, 3=C, 4=D
+  Int_t ChannelNr[runChannelNumberWC];
+  Int_t WOMID[runChannelNumberWC]; //1=A, 2=B, 3=C, 4=D
 
-  float chPE[channelCount];     // single channel amplitude at sum signal
-  float chPE_int[channelCount]; // single channel integral
+  float chPE[runChannelNumberWC];     // single channel amplitude at sum signal
+  float chPE_int[runChannelNumberWC]; // single channel integral
 
-  std::vector<float> amp(channelCount, -999);
-  std::vector<float> amp_inRange(channelCount, -999);
-  std::vector<float> max(channelCount, -999);
-  std::vector<float> min(channelCount, -999);
-  Float_t t[channelCount];
-  Float_t tSiPM[channelCount];
+  std::vector<float> amp(runChannelNumberWC, -999);
+  std::vector<float> amp_inRange(runChannelNumberWC, -999);
+  std::vector<float> max(runChannelNumberWC, -999);
+  std::vector<float> min(runChannelNumberWC, -999);
+  Float_t t[runChannelNumberWC];
+  Float_t tSiPM[runChannelNumberWC];
 
-  float Integral_0_300[channelCount];   //array used to store Integral of signal from 0 to 300ns
-  float Integral_inRange[channelCount]; // calculate integral in given range
-  float Integral[channelCount];
-  float Integral_mVns[channelCount];
+  float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
+  float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
+  float Integral[runChannelNumberWC];
+  float Integral_mVns[runChannelNumberWC];
 
   float BL_output[4];                  //array used for output getBL-function
-  Float_t BL_lower[channelCount];      //store baseline for channelCount channels for 0-75ns range
-  Float_t BL_RMS_lower[channelCount];  //store rms of baseline for channelCount channels for 0-75ns range
-  Float_t BL_Chi2_lower[channelCount]; //store chi2/dof of baseline-fit for channelCount channels for 0-75ns range
-  Float_t BL_pValue_lower[channelCount];
-  Float_t BL_upper[channelCount];      //store baseline for channelCount channels for 220-320ns range
-  Float_t BL_RMS_upper[channelCount];  //store rms of baseline for channelCount channels for 220-320ns range
-  Float_t BL_Chi2_upper[channelCount]; //store chi2/dof of baseline-fit for channelCount channels for 220-320ns range
-  Float_t BL_pValue_upper[channelCount];
+  Float_t BL_lower[runChannelNumberWC];      //store baseline for runChannelNumberWC channels for 0-75ns range
+  Float_t BL_RMS_lower[runChannelNumberWC];  //store rms of baseline for runChannelNumberWC channels for 0-75ns range
+  Float_t BL_Chi2_lower[runChannelNumberWC]; //store chi2/dof of baseline-fit for runChannelNumberWC channels for 0-75ns range
+  Float_t BL_pValue_lower[runChannelNumberWC];
+  Float_t BL_upper[runChannelNumberWC];      //store baseline for runChannelNumberWC channels for 220-320ns range
+  Float_t BL_RMS_upper[runChannelNumberWC];  //store rms of baseline for runChannelNumberWC channels for 220-320ns range
+  Float_t BL_Chi2_upper[runChannelNumberWC]; //store chi2/dof of baseline-fit for runChannelNumberWC channels for 220-320ns range
+  Float_t BL_pValue_upper[runChannelNumberWC];
 
-  Float_t BL_used[channelCount];
-  Float_t BL_Chi2_used[channelCount];
-  Float_t BL_pValue_used[channelCount];
-  float noiseLevel[channelCount];
+  Float_t BL_used[runChannelNumberWC];
+  Float_t BL_Chi2_used[runChannelNumberWC];
+  Float_t BL_pValue_used[runChannelNumberWC];
+  float noiseLevel[runChannelNumberWC];
 
   int nPeaks = 4; // maximum number of peaks to be stored by peakfinder; has to be set also when creating branch
-  Double_t peakX[channelCount][nPeaks];
-  Double_t peakY[channelCount][nPeaks];
+  Double_t peakX[runChannelNumberWC][nPeaks];
+  Double_t peakY[runChannelNumberWC][nPeaks];
 
   int NumberOfBins;
-  Int_t EventIDsamIndex[channelCount];
-  Int_t FirstCellToPlotsamIndex[channelCount];
+  Int_t EventIDsamIndex[runChannelNumberWC];
+  Int_t FirstCellToPlotsamIndex[runChannelNumberWC];
 
   TH1F hCh("hCh", "dummy;ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
   std::vector<TH1F *> hChSum;
   std::vector<TH1F> hChtemp;
   std::vector<TH1F *> hChShift;
   std::vector<TH1F> hChShift_temp;
-  Short_t amplValues[channelCount][1024];
+  Short_t amplValues[runChannelNumberWC][1024];
   if (print)
   {
 
-    for (int i = 0; i < channelCount; i++)
+    for (int i = 0; i < runChannelNumberWC; i++)
     {
       TString name("");
       name.Form("hChSum_%d", i);
@@ -294,7 +268,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       hChSum.push_back(h);
     }
 
-    for (int i = 0; i < channelCount; i++)
+    for (int i = 0; i < runChannelNumberWC; i++)
     {
       TString name("");
       name.Form("hChShift_%d", i);
@@ -303,7 +277,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       hChShift.push_back(h);
     }
 
-    for (int i = 0; i < channelCount; i++)
+    for (int i = 0; i < runChannelNumberWC; i++)
     {
       TString name("");
       name.Form("hChShift_temp_%d", i);
@@ -312,7 +286,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       hChShift_temp.push_back(h);
     }
   }
-  for (int i = 0; i < channelCount; i++)
+  for (int i = 0; i < runChannelNumberWC; i++)
   {
     TString name("");
     name.Form("hChtemp_%d", i);
@@ -320,29 +294,25 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     h.SetName(name);
     hChtemp.push_back(h);
   }
-  // uncommtent, if .root file name should equal raw data file
-  //TString plotSaveFolder  = _inDataFolder;
-  //plotSaveFolder.ReplaceAll("data","runs");
+
   TString plotSaveFolder = _outFile;
   plotSaveFolder.ReplaceAll((runName + ".root"), "");
 
-  //Math.top-channelCount.SquareRoot
-
-  TCanvas cWaves("cWaves", "cWaves", 1000, 700);
-  cWaves.Divide(channelCount / 4, 4);
-  TCanvas cCh0("cCh0", "cCh0", 1500, 900);
-  cCh0.Divide(2, 2);
-  TCanvas cTrig("cTrig", "cTrig", 1500, 900);
-  cTrig.Divide(2, 2);
-  TCanvas cSignal("cSignal", "cSignal", 1500, 900);
-  cSignal.Divide(2, 2);
+  TCanvas cWaves("cWaves", "cWaves", 1000, 1000);
+  cWaves.Divide(plotGrid, plotGrid);
+  //TCanvas cCh0("cCh0", "cCh0", 1500, 900);
+  //cCh0.Divide(2, 2);
+  //TCanvas cTrig("cTrig", "cTrig", 1500, 900);
+  //cTrig.Divide(2, 2);
+ // TCanvas cSignal("cSignal", "cSignal", 1500, 900);
+  //cSignal.Divide(2, 2);
   TCanvas cChSum("cChSum", "cChSum", 1500, 900);
-  cChSum.Divide(4, 4);
-  TCanvas sum_total("sum_total", "sum_total", 1500, 900);
-  sum_total.Divide(2);
+  cChSum.Divide(plotGrid, plotGrid);
+  //TCanvas sum_total("sum_total", "sum_total", 1500, 900);
+  //sum_total.Divide(2);
   // clibrated sum
-  TCanvas C_amp_array("C_amp_array", "C_amp_array", 1000, 700);
-  C_amp_array.Divide(3, 3);
+  //TCanvas C_amp_array("C_amp_array", "C_amp_array", 1000, 700);
+  //C_amp_array.Divide(plotGrid, plotGrid);
 
   /*Create branches in the root-tree for the data.*/
   tree->Branch("EventNumber", &EventNumber, "EventNumber/I");
@@ -358,12 +328,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("trigT", &trigT, "trigT/F");
   tree->Branch("tSUMp", &tSUMp, "tSUMp/F");
   tree->Branch("tSUMm", &tSUMm, "tSUMm/F");
-  tree->Branch("runNr", &runNr, "runNr/I"); //run number in google table
-  tree->Branch("angle", &angle, "angle/F");
-  tree->Branch("pdgID", &pdgID, "pdgID/I");
-  tree->Branch("energy", &energy, "energy/F");
-  tree->Branch("mp", &mp, "mp/I");
-  tree->Branch("safSiPM", &safSiPM, "safSiPM/I"); //solid angle factor
 
   //RUN PARAMETER
   tree->Branch("runPosition", &runPosition, "runPosition/I");
@@ -419,10 +383,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
-  std::ifstream countStream(_inFileList);
-  int numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
-                                  std::istreambuf_iterator<char>(), '\n');
-
+  //std::ifstream countStream(_inFileList);
+  // int numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
+  //                               std::istreambuf_iterator<char>(), '\n');
   //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
 
   int fileCounter = 0;
@@ -503,12 +466,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       nitem = fread(&dummy, 1, 1, pFILE);
     }
 
+
+
+
+
+
     int whileCounter = 0;
     /*Loop over events. Events are processed and analysed one by one in order.*/
-
     while (nitem > 0)
     { //event loop
-    skipThisEvent = false;
+      skipThisEvent = false;
       std::vector<TObject *> eventTrash;
       whileCounter++;
       nitem = fread(&EventNumber, sizeof(int), 1, pFILE);
@@ -530,12 +497,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         printf("Percentage: %lf, EventNr: %d, nCh: %d+   \n", ftell(pFILE) / totFileSizeByte, EventNumber, nCh);
       }
 
-      float MeasuredBaseline[channelCount];
-      float AmplitudeValue[channelCount];
-      float ComputedCharge[channelCount];
-      float RiseTimeInstant[channelCount];
-      float FallTimeInstant[channelCount];
-      float RawTriggerRate[channelCount];
+      float MeasuredBaseline[runChannelNumberWC];
+      float AmplitudeValue[runChannelNumberWC];
+      float ComputedCharge[runChannelNumberWC];
+      float RiseTimeInstant[runChannelNumberWC];
+      float FallTimeInstant[runChannelNumberWC];
+      float RawTriggerRate[runChannelNumberWC];
       float floatR = -1;
 
       /*Loop over individual channels. For each event the data from every channel is 
@@ -612,19 +579,19 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         /*Saving the histogram of that event into a temporary histogram hChtemp. These histograms are available outside of the channel-loop. If analysis using the signals/events of multiple channels needs to be done, this can be accomplished by using hChtemp after the channel-loop.*/
         hChtemp.at(i) = hCh;
 
-
-
         //Exceeding Events Skipping
-        if(skipExceedingEvents && !skipThisEvent){
-        if(max[i]>exceedingThreshold){
-         // cout << "EXCEEDING: " << max[i]  <<" CHANNEL: " <<i << endl;
-        skipThisEvent = true;
-        }else{
-         skipThisEvent =false;
+        if (allowExceedingEventSkipping && !skipThisEvent)
+        {
+          if (max[i] > exceedingThreshold)
+          {
+            // cout << "EXCEEDING: " << max[i]  <<" CHANNEL: " <<i << endl;
+            skipThisEvent = true;
+          }
+          else
+          {
+            skipThisEvent = false;
+          }
         }
-        }
-
-
         /*
         __ Baseline Fit _______________________________________________________
         Calculate baseline values infront and after the triggered signal
@@ -658,7 +625,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           BL_pValue_used[i] = BL_pValue_lower[i];
         }
 
-        if (i == skipInChannel && allowEventSkipping)
+        if (i == skipInChannel && allowBaselineEventSkipping)
         {
           if (BL_Chi2_used[i] > 1)
           {
@@ -743,11 +710,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         */
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
-       float integralStartShifted = t_amp - 10;
-       float integralEndShifted = t_amp + 15;
+        float integralStartShifted = t_amp - 10;
+        float integralEndShifted = t_amp + 15;
 
         Integral[i] = Integrate_50ns(&hCh, BL_shift) / calib_charge.at(i); // difined 50 ns window
-        
+
         //TESTBEAM
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
         // calibrated, BL-shifted amplitude at maximum in window
@@ -772,10 +739,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         else
           amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_shift, integralStart, integralEnd);
 
-
-
-  	    
-
         /*
         __ Printing Wafevorms ____________________________________________
         The signals for events can be printed to a .pdf file called waves.pdf. The rate at which the events are drawn to waves.pdf is set via the variable wavesPrintRate. Additional requirements can be set in the if-statement to look at specific events only.
@@ -783,13 +746,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         */
         if (print)
         {
-
-          //  if (EventNumber % wavesPrintRate == 0)
-          if ((currentPrint != fileCounter) || (printedExtraEvents 	< printExtraEvents))
+          if ((currentPrint != fileCounter) || (printedExtraEvents < printExtraEvents))
           {
-             // cout << "PRINT:" <<i <<" COUNT:"<<printedExtraEvents  <<endl;
-
-            //  cWaves.cd(1 + 4 * (i % 6) + (i) / 6);
             cWaves.cd(i + 1);
             hCh.DrawCopy();
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
@@ -836,7 +794,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       __ TIMING _____
       */
       trigT = t[triggerChannel];
-      for (int i = 0; i <= channelCount - 1; i++)
+      for (int i = 0; i < runChannelNumberWC ; i++)
       {
         tSiPM[i] = t[i] - trigT;
       }
@@ -845,7 +803,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
       if (!skipThisEvent && print)
       {
-        for (int i = 0; i <= channelCount - 1; i++)
+        for (int i = 0; i < runChannelNumberWC; i++)
         {
           hChSum.at(i)->Add(&hChtemp.at(i), 1);
         }
@@ -854,23 +812,24 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       if (!skipThisEvent && print)
       {
         /*Saving the plotted signals/events to a new page in the .pdf file.*/
-          if ((currentPrint != fileCounter) || (printedExtraEvents  	< printExtraEvents))
+        if ((currentPrint != fileCounter) || (printedExtraEvents < printExtraEvents))
         {
-                printedExtraEvents++;
+          printedExtraEvents++;
+          currentPrint = fileCounter;
 
           if (fileCounter == 0)
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
-            C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
-            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
-            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
+          //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
+            //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
+            //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
           }
           else
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
-            C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
-            cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
-            cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
+           // C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
+            //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
+            //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
           }
         }
       }
@@ -878,38 +837,32 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       /*Writing the data for that event to the tree.*/
       if (!skipThisEvent)
       {
-       //   cout << "NOT SKIIPEd: " << endl;
         tree->Fill();
-      }else{
-                skippedCount = skippedCount + 1;
-
       }
-      // cout<<"BASELINE: "<<skipThisEvent<<"     "<< skippedCount<<endl;
-
-      // cout<<"SIZE OF: "<<sizeof(amp_array)<< endl;
-      //tree->Print();
-      currentPrint = fileCounter;
+      else
+      {
+        skippedCount = skippedCount + 1;
+      }
     }
     auto nevent = tree->GetEntries();
 
-    cout << "Events:  " << nevent << " Skipped:  " << skippedCount << endl;
+    cout << "Events in Tree:  " << nevent << " Skipped:  " << skippedCount << endl;
     fclose(pFILE);
     fileCounter++;
   }
 
   if (print)
   {
-
     /*Clearing objects and saving files.*/
     inList.close();
     cWaves.Clear();
 
     cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
-    C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
-    cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
-    cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
+    //C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
+    //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
+   // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
 
-    for (int i = 0; i <= 15; i++)
+    for (int i = 0; i < runChannelNumberWC; i++)
     {
       cChSum.cd(i + 1);
       hChSum.at(i)->Draw();
