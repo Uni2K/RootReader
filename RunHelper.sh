@@ -5,6 +5,18 @@
 # -lSpectrum option might be necessary with some ROOT installations
 #g++ geometry.C read.C analysis.C main.C -rpath ${ROOTSYS}/lib `root-config --libs --cflags` -lSpectrum -o read
 #g++ geometry.C read.C analysis.C main.C `root-config --libs --cflags` -lSpectrum -o read
+threadsStarted=0
+threadCounter=0
+counter=0
+stopNewThreads="0"
+
+fastRunNumber=0
+fastInFolder=0
+fastOutfolder=0
+fastHeaderSize=0
+fastRunDir=0
+fastRunName=0
+fastLineArr=0
 
 showInformation() {
     echo "  _____             _   _    _      _                 "
@@ -46,7 +58,7 @@ checkDependencies() {
 chooseOutFolder() {
     checkDependencies
     outFolder=$(zenity --file-selection --directory --title "Select outpu Folder (.bin Files)?")
-   #  echo $outFolder
+    #  echo $outFolder
 }
 
 chooseInFolder() {
@@ -83,7 +95,7 @@ parseRunList() {
         angle=$(echo ${fields[2]} | cut -c 6-)
         energy=$(echo ${fields[3]} | cut -c 2-)
         channel=$(echo ${fields[4]} | cut -c 3-)
-      #  echo "Runlist (2019) creating..."
+        #  echo "Runlist (2019) creating..."
         line_to_runlsit="$runNr $dir_name $pos $angle $energy $channel"
 
     else
@@ -215,7 +227,7 @@ readFull() {
     while read line; do
         [[ $line == \#* ]] && continue
         lineArr=($line)
-         echo "$lineArr"
+        echo "$lineArr"
 
         if [ "${lineArr[0]}" = "$runNr" ] || [ $readAll = true ]; then
             runName=${lineArr[1]}
@@ -226,7 +238,7 @@ readFull() {
             fi
 
             #time $here/readFull $runDir/$runName.list $inFolder/$runName/ $runDir/out.root ${lineArr[0]} ${lineArr[2]} ${lineArr[3]} ${lineArr[4]} ${lineArr[5]} ${lineArr[6]}
-            echo " RUN "
+
             time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}"
 
         fi
@@ -236,14 +248,13 @@ readFull() {
 
 compileMerger() {
     echo "Compiling Root Merger..."
-    g++ ./src/mergeROOTFiles.C $(root-config --libs --cflags) -lSpectrum -o mergeROOTFiles
+    g++ ./src/mergeROOTFiles.C $(root-config --libs --cflags) -lSpectrum -o ./src/mergeROOTFiles
     echo "Compiling done!"
 }
 
 merger() {
     rootFileList=$1
-
-    $src/mergeROOTFiles $rootFileList $2 $3
+    ./src/mergeROOTFiles $rootFileList $2 $3
 }
 
 readFast() {
@@ -251,7 +262,7 @@ readFast() {
         compileRead
     fi
     compileMerger
-
+    maxThreads=8
     runNr=$1
     readAll=false
     inFolder=$2
@@ -277,28 +288,56 @@ readFast() {
 
                 runDir=$saveFolder/$runName
                 mkdir "$runDir"
-                if [ ! -e $runDir/$runName.list ]; then
+                rm -rf $runDir/*/
+                 if [ ! -e $runDir/$runName.list ]; then
                     ls $inFolder/$runName | grep \.bin >$runDir/$runName.list #Durchsucht das RunName verzeichnis nach bins files und erstellt eine Runlist
                 fi
 
                 counter=0
+                threadCounter=0
+
                 #Für jede Bin einzeln durchlaufen
                 while read line; do
-                    #Create RunList for every file
+
+                    #    ls *.cfg | xargs -P 4 -n 1 read_cfg.sh
+                    #   Create RunList for every file
+
                     echo $line >$runDir/$counter.list
                     mkdir $runDir/$counter
-
-                    ./src/read $runDir/$counter.list $inFolder/$runName/ $runDir/$counter/out.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues"
-
                     runDirRelative="${runDir//$here/}"
                     rootTreeFilePath=".$runDirRelative/$counter/out.root/T"
                     rootFileList="${rootFileList}||$rootTreeFilePath"
-
-                    echo "$rootFileList"
-
                     counter=$((counter + 1))
 
-                done <$runDir/$runName.list
+                done \
+                    <$runDir/$runName.list
+
+                fastRunName=$runNumber
+                fastInFolder=$inFolder
+                fastOutFolder=$outFolder
+                fastHeaderSize=$headerSize
+                fastRunDir=$runDir
+                fastRunName=$runName
+                fastLineArr=$lineArr
+                fastRunNumber=$runNr
+
+                remainder=$((counter % maxThreads))
+                loopNumber=$((counter / maxThreads))
+                if [ "$remainder" != "0" ]; then
+                    loopNumber=$((loopNumber + 1))
+                fi
+
+                echo "Loop Number: $loopNumber $counter"
+                for currentBin in 1 .. $loopNumber; do
+                    for ((i = 0; i < "$maxThreads"; i++)); do
+                        readFastIteration $threadCounter &
+                        threadCounter=$((threadCounter + 1))
+                    done
+
+                    wait
+
+                done
+                wait
 
                 merger $rootFileList $runDir $runName
                 #rm $runDir/*.list
@@ -317,6 +356,7 @@ readFast() {
 }
 
 readRoot() {
+
     readMode=$1  #0= FULL #1=FAST
     runNumber=$2 #a=ALL
     inFolder=$3
@@ -332,6 +372,13 @@ readRoot() {
     esac
 
 }
+
+readFastIteration() {
+
+    ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}"
+
+}
+
 
 saveConfig() {
     rm config.txt 2>/dev/null
@@ -362,6 +409,15 @@ loadConfig() {
         isDC=$(awk 'NR == 6' config.txt)
         dynamicBL=$(awk 'NR == 7' config.txt)
         useCalibValues=$(awk 'NR == 8' config.txt)
+
+        if [ "$readMode" = "1" ]; then
+                runMode="Fast"
+            else
+                runMode="Full"
+           
+            fi
+
+
 
         echo "config loaded!"
     else
@@ -397,7 +453,7 @@ start() {
         export -f parseRunList
         runlist="RootRunlist.txt"
         rm "$runlist"
-        ls $inFolder | sort -n | xargs -n 1 -P 1 bash -c "parseRunList $runlist $nameSchema" 
+        ls $inFolder | sort -n | xargs -n 1 -P 1 bash -c "parseRunList $runlist $nameSchema"
 
         #Check if readList exists
         if [ -f $runList ]; then
@@ -441,10 +497,6 @@ useCalibValues="0"
 dynamicBL="1"
 isDC="0"
 nameSchema="2019"
-
-
-
-
 
 echo "-------------------------------------------------------"
 
@@ -601,4 +653,3 @@ done
 
 # sudo apt-get install zenity
 #FILE=$(dialog --title "Delete a file" --stdout --title "Please choose a file to delete" --fselect /tmp/ 14 48)
- 

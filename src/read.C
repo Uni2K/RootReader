@@ -69,6 +69,8 @@ Float_t trigT = -999; //t_trig = (t0+t1+t2+t3)/4
 Float_t tSUMp = -999;
 Float_t tSUMm = -999;
 Int_t nCh = -1;
+int womCount = 4;
+
 int nActiveCh = -1;
 
 #define btoa(x) ((x) ? "true" : "false")
@@ -85,7 +87,7 @@ bool isCalibrated = true;
 float integralStart = 100; //Testbeam: 100, 125 charge, 100-150
 float integralEnd = 150;
 int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
-int plotGrid=5;
+int plotGrid = 5;
 int printExtraEvents = 0;
 int printedExtraEvents = 0;
 
@@ -119,13 +121,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     runAngle = stoi(runParams[2]);
     runEnergy = stoi(runParams[3]);
     runChannelNumberWC = stoi(runParams[4]);
-    
   }
   catch (const std::exception &e)
   {
     std::cerr << e.what() << '\n';
   }
-  plotGrid=ceil(sqrt(runChannelNumberWC));
+  plotGrid = ceil(sqrt(runChannelNumberWC));
 
   if (dynamicBL_ == "0")
   {
@@ -210,7 +211,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   gStyle->SetLineScalePS(1); // export high resolution plots
 
   Int_t ChannelNr[runChannelNumberWC];
-  Int_t WOMID[runChannelNumberWC]; //1=A, 2=B, 3=C, 4=D
+  int WOMID[runChannelNumberWC]; //1=A, 2=B, 3=C, 4=D
 
   float chPE[runChannelNumberWC];     // single channel amplitude at sum signal
   float chPE_int[runChannelNumberWC]; // single channel integral
@@ -225,9 +226,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
   float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
   float Integral[runChannelNumberWC];
+  float IntegralSum[runChannelNumberWC];
+
   float Integral_mVns[runChannelNumberWC];
 
-  float BL_output[4];                  //array used for output getBL-function
+  float BL_output[4];                        //array used for output getBL-function
   Float_t BL_lower[runChannelNumberWC];      //store baseline for runChannelNumberWC channels for 0-75ns range
   Float_t BL_RMS_lower[runChannelNumberWC];  //store rms of baseline for runChannelNumberWC channels for 0-75ns range
   Float_t BL_Chi2_lower[runChannelNumberWC]; //store chi2/dof of baseline-fit for runChannelNumberWC channels for 0-75ns range
@@ -254,7 +257,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   std::vector<TH1F *> hChSum;
   std::vector<TH1F> hChtemp;
   std::vector<TH1F *> hChShift;
-  std::vector<TH1F> hChShift_temp;
+
+  Float_t amplitudeChannelSumWOM[womCount];
+  Float_t chargeChannelSumWOM[womCount];
+  std::vector<TH1F *> histChannelSumWOM;
+
   Short_t amplValues[runChannelNumberWC][1024];
   if (print)
   {
@@ -277,15 +284,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       hChShift.push_back(h);
     }
 
-    for (int i = 0; i < runChannelNumberWC; i++)
+    for (int i = 0; i < womCount; i++)
     {
       TString name("");
-      name.Form("hChShift_temp_%d", i);
-      TH1F h("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
-      h.SetName(name);
-      hChShift_temp.push_back(h);
+      name.Form("histChannelSumWOM%d", i);
+      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+      h->SetName(name);
+      histChannelSumWOM.push_back(h);
     }
   }
+
   for (int i = 0; i < runChannelNumberWC; i++)
   {
     TString name("");
@@ -304,7 +312,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   //cCh0.Divide(2, 2);
   //TCanvas cTrig("cTrig", "cTrig", 1500, 900);
   //cTrig.Divide(2, 2);
- // TCanvas cSignal("cSignal", "cSignal", 1500, 900);
+  // TCanvas cSignal("cSignal", "cSignal", 1500, 900);
   //cSignal.Divide(2, 2);
   TCanvas cChSum("cChSum", "cChSum", 1500, 900);
   cChSum.Divide(plotGrid, plotGrid);
@@ -370,10 +378,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("peakX", peakX, "peakX[nCh][4]/D");
   tree->Branch("peakY", peakY, "peakY[nCh][4]/D");
   // CALIBRATED SUM
-  tree->Branch("chPE", chPE, "chPE[nCh]/F");
-  tree->Branch("chPE_int", chPE_int, "chPE_int[nCh]/F");
+  tree->Branch("chargeChannelSumWOM", chargeChannelSumWOM, "chargeChannelSumWOM[4]/F");
+  tree->Branch("amplitudeChannelSumWOM", amplitudeChannelSumWOM, "amplitudeChannelSumWOM[4]/F");
+
+  //  tree->Branch("chPE_int", channelSumWOM_amp, "chPE_int[nCh]/F");
+
   tree->Branch("EventIDsamIndex", EventIDsamIndex, "EventIDsamIndex[nCh]/I");
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
+
   struct rusage r_usage;
 
   /*Start reading the raw data from .bin files.*/
@@ -466,11 +478,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       nitem = fread(&dummy, 1, 1, pFILE);
     }
 
-
-
-
-
-
     int whileCounter = 0;
     /*Loop over events. Events are processed and analysed one by one in order.*/
     while (nitem > 0)
@@ -535,19 +542,23 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         if (i <= 7)
         {
-          WOMID[i] = 4;
+          WOMID[i] = 3;
         }
         else if (i <= 16)
         {
-          WOMID[i] = 3;
+          WOMID[i] = 2;
         }
         else if (i <= 24)
         {
+          WOMID[i] = 0;
+        }
+        else if (i < 31)
+        {
           WOMID[i] = 1;
         }
-        else if (i <= 31)
+        else
         {
-          WOMID[i] = 2;
+          WOMID[i] = -1;
         }
 
         TString title("");
@@ -777,6 +788,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           hCh.GetXaxis()->SetRange(1, 1024);
           // End of loop over inividual channels
         }
+        if (WOMID[i] >= 0)
+          histChannelSumWOM[WOMID[i]]->Add(&hCh);
       }
 
       /*
@@ -786,6 +799,22 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       Thus, there are only 7 values from 8. The result for the WOM is therefore
       scaled up by 8/7 to make the numbers comparable.
       */
+      for (int i = 0; i < 4; i++)
+      {
+
+        float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
+        float integralStartShifted = t_amp - 10;
+        float integralEndShifted = t_amp + 15;
+
+        IntegralSum[i] = integral(&hCh, integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
+
+        amplitudeChannelSumWOM[i] = amp_atTime(histChannelSumWOM[i], t_amp);
+
+        // reverse amplitude calibration before integration
+        histChannelSumWOM[i]->Scale(calib_amp.at(i));
+        chargeChannelSumWOM[i] = IntegralSum[i];
+        // cout << "chargeChannelSum:  " << chargeChannelSumWOM[i]  << endl;
+      }
 
       // PE_WOM1 = 8 / 7 * (amp[0] + amp[1] + amp[2] + amp[3] + amp[4] + amp[5] + amp[6]);
       //PE_WOM2 = (amp[7] + amp[8] + amp[9] + amp[10] + amp[11] + amp[12] + amp[13] + amp[14]);
@@ -794,7 +823,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       __ TIMING _____
       */
       trigT = t[triggerChannel];
-      for (int i = 0; i < runChannelNumberWC ; i++)
+      for (int i = 0; i < runChannelNumberWC; i++)
       {
         tSiPM[i] = t[i] - trigT;
       }
@@ -820,14 +849,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           if (fileCounter == 0)
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
-          //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
+            //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
             //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
             //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
           }
           else
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
-           // C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
+            // C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
             //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
             //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
           }
@@ -860,7 +889,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
     //C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
     //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
-   // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
+    // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
 
     for (int i = 0; i < runChannelNumberWC; i++)
     {

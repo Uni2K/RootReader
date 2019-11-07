@@ -3,3 +3,9 @@ data/
 runs/
 src/read
 RootRunlist
+.vscode/
+threadcounter.txt
+src/mergeROOTFiles
+mergeROOTFiles
+RootRunlist.txt
+config.txt
