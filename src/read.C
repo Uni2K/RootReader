@@ -72,7 +72,7 @@ Int_t nCh = -1;
 int womCount = 4;
 
 int nActiveCh = -1;
-
+int numberOfBinaryFiles = 0;
 #define btoa(x) ((x) ? "true" : "false")
 int defaultErrorLevel = kError;
 bool print = true;
@@ -305,6 +305,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
   TString plotSaveFolder = _outFile;
   plotSaveFolder.ReplaceAll((runName + ".root"), "");
+  plotSaveFolder.ReplaceAll(("out.root"), "");
 
   TCanvas cWaves("cWaves", "cWaves", 1000, 1000);
   cWaves.Divide(plotGrid, plotGrid);
@@ -395,9 +396,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
-  //std::ifstream countStream(_inFileList);
-  // int numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
-  //                               std::istreambuf_iterator<char>(), '\n');
+  std::ifstream countStream(_inFileList);
+  numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
+                              std::istreambuf_iterator<char>(), '\n');
   //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
 
   int fileCounter = 0;
@@ -802,11 +803,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       for (int i = 0; i < 4; i++)
       {
 
-        float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
+        float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
 
-        IntegralSum[i] = integral(&hCh, integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
+        IntegralSum[i] = integral(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
 
         amplitudeChannelSumWOM[i] = amp_atTime(histChannelSumWOM[i], t_amp);
 
@@ -846,7 +847,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           printedExtraEvents++;
           currentPrint = fileCounter;
 
-          if (fileCounter == 0)
+          if (fileCounter == 0 && fileCounter != (numberOfBinaryFiles - 1))
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
             //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
@@ -885,8 +886,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     /*Clearing objects and saving files.*/
     inList.close();
     cWaves.Clear();
-
-    cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
+    if (numberOfBinaryFiles != 1)
+    {
+      cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
+    }
     //C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
     //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
     // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");

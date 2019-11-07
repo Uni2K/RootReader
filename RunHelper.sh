@@ -197,7 +197,7 @@ parseRunList() {
 }
 
 compileRead() {
-    echo "Compiling ReadFull..."
+    echo "Compiling Read.C..."
     g++ ./src/geometry.C ./src/read.C ./src/analysis.C ./src/main.C ./src/calib.C $(root-config --libs --cflags) -lSpectrum -o ./src/read
     echo "Compiling done!"
 }
@@ -255,12 +255,29 @@ compileMerger() {
 merger() {
     rootFileList=$1
     ./src/mergeROOTFiles $rootFileList $2 $3
+    
+    #merge PDF Waves.pdf
+    pdfunite $(find $2 -name "*waves.pdf") $2/waves.pdf 
+    pdfunite $(find $2 -name "*ChSum.pdf") $2/ChSum.pdf 
+
+}
+
+installPDFUnite(){
+       PKG_OK=$(dpkg-query -W --showformat='${Status}\n' poppler-utils | grep "ok installed")
+    if [ "" == "$PKG_OK" ]; then
+        echo Please enter the sudo password to install PDF Unite to create PDF files
+
+        sudo apt-get install poppler-utils
+    else
+        echo "PDFUnite is installed! "
+    fi
 }
 
 readFast() {
     if [ "$shouldCompile" = true ]; then
         compileRead
     fi
+    installPDFUnite
     compileMerger
     maxThreads=8
     runNr=$1
@@ -288,7 +305,7 @@ readFast() {
 
                 runDir=$saveFolder/$runName
                 mkdir "$runDir"
-                rm -rf $runDir/*/
+                rm -rf $runDir/*
                  if [ ! -e $runDir/$runName.list ]; then
                     ls $inFolder/$runName | grep \.bin >$runDir/$runName.list #Durchsucht das RunName verzeichnis nach bins files und erstellt eine Runlist
                 fi
@@ -341,8 +358,8 @@ readFast() {
 
                 merger $rootFileList $runDir $runName
                 #rm $runDir/*.list
-                rm -rf $runDir/*/
-                find $runDir -name "*.list" -type f -delete
+             rm -rf $runDir/*/
+            find $runDir -name "*.list" -type f -delete
 
             fi
 
@@ -490,7 +507,7 @@ outFolder=$here/runs
 shouldCompile=true
 runMode="Full"
 runNumber=a
-readMode=0
+readMode=1
 headerSize=a
 useExistingRunList=false
 useCalibValues="0"
