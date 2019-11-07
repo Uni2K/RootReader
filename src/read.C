@@ -124,7 +124,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   }
   catch (const std::exception &e)
   {
-    std::cerr << e.what() << '\n';
+    // std::cerr << e.what() << '\n';
   }
   plotGrid = ceil(sqrt(runChannelNumberWC));
 
@@ -157,7 +157,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   char cwd[PATH_MAX];
   if (getcwd(cwd, sizeof(cwd)) != NULL)
   {
-    printf("Current working dir: %s\n", cwd);
+    //printf("Current working dir: %s\n", cwd);
     workingDir = cwd;
   }
   else
@@ -178,32 +178,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   if (!switch_BL)
     BL_const = readCalib(calib_path_bl, runName, 0);
 
-  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
-  cout << ":::::::::::::::::::RUN PARAMETER:::::::::::::::::::::::::::::::::::::::" << endl;
-  cout << "RunNr: " << runNumber << endl;
-  cout << "Position: " << runPosition << endl;
-  cout << "Angle: " << runAngle << endl;
-  cout << "Energy: " << runEnergy << endl;
-  cout << "Channel/WC: " << runChannelNumberWC << endl;
-  cout << ":::::::::::::::::::FILE PARAMETER::::::::::::::::::::::::::::::::::::::" << endl;
-  cout << "RunName: " << runName << endl;
-  cout << "headerSize Input: " << _headerSize << endl;
-  cout << "InDataFolder: " << _inDataFolder.Data() << endl;
-  cout << "OutFile: " << _outFile << endl;
-  cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
-  cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
-  cout << "Amplitude Calibration: " << vectorToString(calib_amp) << endl;
-  cout << "Charge Calibration: " << vectorToString(calib_charge) << endl;
-  cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(isCalibrated) << endl;
-  cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
-
   /*Create root-file and root-tree for data*/
   TFile *rootFile = new TFile(_outFile, "RECREATE");
   if (rootFile->IsZombie())
   {
-    cout << "PROBLEM with the initialization of the output ROOT ntuple "
-         << _outFile << ": check that the path is correct!!!"
-         << endl;
+    if (numberOfBinaryFiles > 1)
+    {
+      cout << "PROBLEM with the initialization of the output ROOT ntuple "
+           << _outFile << ": check that the path is correct!!!"
+           << endl;
+    }
     exit(-1);
   }
   TTree *tree = new TTree("T", "USBWC Data Tree");
@@ -309,6 +293,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
   TCanvas cWaves("cWaves", "cWaves", 1000, 1000);
   cWaves.Divide(plotGrid, plotGrid);
+  TCanvas womCanvas("womCanvas", "womCanvas", 1000, 1000);
+  womCanvas.Divide(2, 2);
+
   //TCanvas cCh0("cCh0", "cCh0", 1500, 900);
   //cCh0.Divide(2, 2);
   //TCanvas cTrig("cTrig", "cTrig", 1500, 900);
@@ -401,13 +388,34 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
                               std::istreambuf_iterator<char>(), '\n');
   //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
 
+  if (numberOfBinaryFiles > 1)
+  {
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << ":::::::::::::::::::RUN PARAMETER:::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << "RunNr: " << runNumber << endl;
+    cout << "Position: " << runPosition << endl;
+    cout << "Angle: " << runAngle << endl;
+    cout << "Energy: " << runEnergy << endl;
+    cout << "Channel/WC: " << runChannelNumberWC << endl;
+    cout << ":::::::::::::::::::FILE PARAMETER::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << "RunName: " << runName << endl;
+    cout << "headerSize Input: " << _headerSize << endl;
+    cout << "InDataFolder: " << _inDataFolder.Data() << endl;
+    cout << "OutFile: " << _outFile << endl;
+    cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
+    cout << "Amplitude Calibration: " << vectorToString(calib_amp) << endl;
+    cout << "Charge Calibration: " << vectorToString(calib_charge) << endl;
+    cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(isCalibrated) << endl;
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+  }
+
   int fileCounter = 0;
   int currentPrint = -1;
   while (inList >> fileName)
   {
 
     fileName = _inDataFolder + fileName;
-    cout << endl;
     cout << fileName << endl;
     FILE *pFILE = fopen(fileName.Data(), "rb");
     if (pFILE == NULL)
@@ -445,7 +453,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       {
         newerVersion = true;
       }
-      cout << "VERSION: " << softwareVersion << " HEADERSIZE: " << headerSize << "  Newer Version: " << newerVersion << endl;
+      if (numberOfBinaryFiles > 1)
+        cout << "VERSION: " << softwareVersion << " HEADERSIZE: " << headerSize << "  Newer Version: " << newerVersion << endl;
     }
 
     if (headerSize > 328)
@@ -474,7 +483,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
     if (nActiveCh > 9 || newerVersion)
     {
-      cout << endl;
       char dummy;
       nitem = fread(&dummy, 1, 1, pFILE);
     }
@@ -802,6 +810,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       */
       for (int i = 0; i < 4; i++)
       {
+        womCanvas.cd(i + 1);
+        histChannelSumWOM[i]->DrawCopy();
 
         float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
         float integralStartShifted = t_amp - 10;
@@ -811,7 +821,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         amplitudeChannelSumWOM[i] = amp_atTime(histChannelSumWOM[i], t_amp);
 
-        // reverse amplitude calibration before integration
+        float minY = histChannelSumWOM[i]->GetMinimum();
+        float maxY = histChannelSumWOM[i]->GetMaximum();
+
+        TLine *ln4 = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
+        TLine *ln5 = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+
+        ln4->SetLineColor(2);
+        ln5->SetLineColor(2);
+        ln4->Draw("same");
+        ln5->Draw("same");
+
         histChannelSumWOM[i]->Scale(calib_amp.at(i));
         chargeChannelSumWOM[i] = IntegralSum[i];
         // cout << "chargeChannelSum:  " << chargeChannelSumWOM[i]  << endl;
@@ -850,6 +870,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           if (fileCounter == 0 && fileCounter != (numberOfBinaryFiles - 1))
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
+            womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf("), "pdf");
             //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
             //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
             //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
@@ -857,6 +878,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           else
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
+            womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf"), "pdf");
+
             // C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
             //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
             //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
@@ -885,11 +908,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   {
     /*Clearing objects and saving files.*/
     inList.close();
-    cWaves.Clear();
+
     if (numberOfBinaryFiles != 1)
     {
       cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
+      womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf)"), "pdf");
     }
+    cWaves.Clear();
+    womCanvas.Clear();
     //C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
     //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
     // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");

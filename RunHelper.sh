@@ -259,6 +259,7 @@ merger() {
     #merge PDF Waves.pdf
     pdfunite $(find $2 -name "*waves.pdf") $2/waves.pdf 
     pdfunite $(find $2 -name "*ChSum.pdf") $2/ChSum.pdf 
+    pdfunite $(find $2 -name "*womSum.pdf") $2/womSum.pdf 
 
 }
 
@@ -279,7 +280,7 @@ readFast() {
     fi
     installPDFUnite
     compileMerger
-    maxThreads=8
+    maxThreads=4
     runNr=$1
     readAll=false
     inFolder=$2
@@ -340,12 +341,19 @@ readFast() {
 
                 remainder=$((counter % maxThreads))
                 loopNumber=$((counter / maxThreads))
-                if [ "$remainder" != "0" ]; then
-                    loopNumber=$((loopNumber + 1))
-                fi
+                #loopNumber=$((loopNumber - 1)) #to have to correct number in the loop
+               # if [ "$remainder" != "0" ]; then
+                 #   loopNumber=$((loopNumber + 1))
+               # fi
 
-                echo "Loop Number: $loopNumber $counter"
-                for currentBin in 1 .. $loopNumber; do
+
+
+
+
+                echo "Loop Number: $loopNumber Number of Files: $counter Extra Threads: $remainder"
+                for currentBin in $(seq 1 $loopNumber); do
+                  echo "Main Thread Loop Started"
+
                     for ((i = 0; i < "$maxThreads"; i++)); do
                         readFastIteration $threadCounter &
                         threadCounter=$((threadCounter + 1))
@@ -354,6 +362,15 @@ readFast() {
                     wait
 
                 done
+                for currentBinRemain in $(seq 1 $remainder); do
+                echo "Remainder Thread Started"
+                        readFastIteration $threadCounter &
+                        threadCounter=$((threadCounter + 1))
+
+                done
+
+
+
                 wait
 
                 merger $rootFileList $runDir $runName
@@ -505,7 +522,7 @@ src=$here/src/
 inFolder=$here/data
 outFolder=$here/runs
 shouldCompile=true
-runMode="Full"
+runMode="Fast"
 runNumber=a
 readMode=1
 headerSize=a
