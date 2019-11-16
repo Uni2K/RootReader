@@ -31,7 +31,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <sstream>
-
+#include <numeric>
 //specific
 #include "geometry.h"
 #include "analysis.h"
@@ -84,13 +84,14 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = true;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 100; //Testbeam: 100, 125 charge, 100-150
-float integralEnd = 150;
-int triggerChannel = 31; //starting from 1 -> Calib: 9, Testbeam: 15
+float integralStart = 150; //Testbeam: 100, 125 charge, 100-150
+float integralEnd = 200;
+int triggerChannel = 9; //starting from 1 -> Calib: 9, Testbeam '18: 15
 int plotGrid = 5;
-int printExtraEvents = 0;
-int printedExtraEvents = 0;
 
+int maximalExtraPrintEvents = 0;
+int printedExtraEvents = 0;
+bool printExtraEvents = false;
 //Event Skipping
 bool skipThisEvent = false;
 int skippedCount = 0;
@@ -100,6 +101,11 @@ int skipInChannel = 0;
 //Skip events that exceed the WC maximum
 bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 650;
+
+//Allow Force Printing individual events
+bool forcePrintEvent = false;
+int maximalForcePrintEvents = 5;
+int forcePrintEvents = 0;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
@@ -175,8 +181,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     calib_amp = readCalib(calib_path_amp, runName, 1);
   if (isCalibrated)
     calib_charge = readCalib(calib_path_charge, runName, 1);
-  if (!switch_BL)
+ if (!switch_BL)
     BL_const = readCalib(calib_path_bl, runName, 0);
+
+
+
 
   /*Create root-file and root-tree for data*/
   TFile *rootFile = new TFile(_outFile, "RECREATE");
@@ -200,19 +209,20 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   float chPE[runChannelNumberWC];     // single channel amplitude at sum signal
   float chPE_int[runChannelNumberWC]; // single channel integral
 
-  std::vector<float> amp(runChannelNumberWC, -999);
-  std::vector<float> amp_inRange(runChannelNumberWC, -999);
+  // std::vector<float> amp(runChannelNumberWC, -999);
+  //std::vector<float> amp_inRange(runChannelNumberWC, -999);
   std::vector<float> max(runChannelNumberWC, -999);
   std::vector<float> min(runChannelNumberWC, -999);
   Float_t t[runChannelNumberWC];
-  Float_t tSiPM[runChannelNumberWC];
+  Float_t tSiPM[(runChannelNumberWC - 1)]; //Minus Trigger
 
-  float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
-  float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
+  //float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
+  //float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
   float Integral[runChannelNumberWC];
-  float IntegralSum[runChannelNumberWC];
+  float IntegralSum[runChannelNumberWC]; //Only Temp
 
-  float Integral_mVns[runChannelNumberWC];
+  float Amplitude[runChannelNumberWC];
+  float AmplitudeSum[runChannelNumberWC];
 
   float BL_output[4];                        //array used for output getBL-function
   Float_t BL_lower[runChannelNumberWC];      //store baseline for runChannelNumberWC channels for 0-75ns range
@@ -337,15 +347,15 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("WOMID", WOMID, "WOMID[nCh]/I");
   tree->Branch("ch", ChannelNr, "ch[nCh]/I");
   // AMPLITUDE
-  tree->Branch("amp", amp.data(), "amp[nCh]/F");                         // calibrated
-  tree->Branch("amp_inRange", amp_inRange.data(), "amp_inRange[nCh]/F"); // calibrated
+  tree->Branch("Amplitude", Amplitude, "Amplitude[nCh]/F"); // calibrated
+  //tree->Branch("amp_inRange", amp_inRange.data(), "amp_inRange[nCh]/F"); // calibrated
   tree->Branch("max", max.data(), "max[nCh]/F");
   tree->Branch("min", min.data(), "min[nCh]/F");
   // INTEGRAL
-  tree->Branch("Integral_0_300", Integral_0_300, "Integral_0_300[nCh]/F");
-  tree->Branch("Integral_inRange", Integral_inRange, "Integral_inRange[nCh]/F");
-  tree->Branch("Integral", Integral, "Integral[nCh]/F");                // calibrated
-  tree->Branch("Integral_mVns", Integral_mVns, "Integral_mVns[nCh]/F"); // calibrated
+  //tree->Branch("Integral_0_300", Integral_0_300, "Integral_0_300[nCh]/F");
+  //tree->Branch("Integral_inRange", Integral_inRange, "Integral_inRange[nCh]/F");
+  tree->Branch("Integral", Integral, "Integral[nCh]/F"); // calibrated
+                                                         // tree->Branch("Integral_mVns", Integral_mVns, "Integral_mVns[nCh]/F"); // calibrated
   // TIMING
   tree->Branch("t", t, "t[nCh]/F");
   tree->Branch("tSiPM", tSiPM, "tSiPM[nCh]/F");
@@ -492,6 +502,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     while (nitem > 0)
     { //event loop
       skipThisEvent = false;
+      forcePrintEvent = false;
       std::vector<TObject *> eventTrash;
       whileCounter++;
       nitem = fread(&EventNumber, sizeof(int), 1, pFILE);
@@ -532,7 +543,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         MeasuredBaseline[i] = floatR;
         nitem = fread(&floatR, 1, 4, pFILE);
         AmplitudeValue[i] = floatR;
-        //  cout<<"AMP: "<<floatR<<endl;
 
         nitem = fread(&floatR, 1, 4, pFILE);
         ComputedCharge[i] = floatR;
@@ -549,15 +559,15 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         The labeling of the WOMs in the box was done using the letters A,B,C,D. For convinience these letters are here replaced by the numbers 1-4 which is stored in the root-tree for every channel and every event.
         */
 
-        if (i <= 7)
+        if (i < 8)
         {
           WOMID[i] = 3;
         }
-        else if (i <= 16)
+        else if (i < 16)
         {
           WOMID[i] = 2;
         }
-        else if (i <= 24)
+        else if (i < 24)
         {
           WOMID[i] = 0;
         }
@@ -569,9 +579,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
           WOMID[i] = -1;
         }
-
         TString title("");
-        title.Form("ch %d, ev %d", i, EventNumber);
+        title.Form("ch %d, ev %d, wom %d", i, EventNumber, WOMID[i]);
         hCh.Reset();
         hCh.SetTitle(title);
 
@@ -699,24 +708,22 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
 
-        // printf("X: %d %f %f %f %f \n",i,peakX[i][0],peakX[i][1],peakX[i][2],peakX[i][3]);
-        // printf("Y: %d %f %f %f %f \n",i,peakY[i][0],peakY[i][1],peakY[i][2],peakY[i][3]);
-
         /*
         __ CFD _____________________________________________________________
         Setting the signal time by using a constant fraction disriminator method.
         The SiPM and the trigger sinals are handled differently using different thresholds.
         */
         if (i == triggerChannel)
-        { //trigger
-          t[i] = CDF(&hCh, 0.5);
+        {                                //trigger
+          t[i] = CFDNegative(&hCh, 0.5); //Negative Trigger
         }
         else
         { //SiPMs
-          t[i] = CFD2(&hCh, 0.35);
+          t[i] = CFDInRange(&hCh, 0.35, integralStart, integralEnd);
+
           if (t[i] < 95)
           {
-            t[i] = CFDinvert2(&hCh, 0.35);
+            t[i] = CFDinvertInRange(&hCh, 0.35, integralStart, integralEnd);
           }
         }
 
@@ -733,9 +740,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
 
-        Integral[i] = Integrate_50ns(&hCh, BL_shift) / calib_charge.at(i); // difined 50 ns window
+        if (isDC)
+        {
+          //Always the same interval
+          float integralStartShifted = integralStart;
+          float integralEndShifted = integralEnd;
+        }
 
-        //TESTBEAM
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted,BL_shift) / calib_charge.at(i);
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted,BL_shift) / calib_amp.at(i);
+
+        //TESTBEAM 2018
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
         // calibrated, BL-shifted amplitude at maximum in window
         //amp[i] = PE(&hCh, calib_amp.at(i), BL_used[i], 100.0, 150.0);
@@ -743,7 +758,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         //amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_used[i], 0.0, 50.0);
 
         // calibrated, BL-shifted charge
-        if (isDC)
+        /*if (isDC)
           Integral_inRange[i] = integral(&hCh, 50, 75, BL_shift) / calib_charge.at(i); // for DC runs
         else
           Integral_inRange[i] = integral(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
@@ -759,6 +774,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         else
           amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_shift, integralStart, integralEnd);
 
+      */
+
+        if (WOMID[i] >= 0)
+          histChannelSumWOM[WOMID[i]]->Add(&hCh);
         /*
         __ Printing Wafevorms ____________________________________________
         The signals for events can be printed to a .pdf file called waves.pdf. The rate at which the events are drawn to waves.pdf is set via the variable wavesPrintRate. Additional requirements can be set in the if-statement to look at specific events only.
@@ -766,7 +785,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         */
         if (print)
         {
-          if ((currentPrint != fileCounter) || (printedExtraEvents < printExtraEvents))
+          if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
           {
             cWaves.cd(i + 1);
             hCh.DrawCopy();
@@ -797,17 +816,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           hCh.GetXaxis()->SetRange(1, 1024);
           // End of loop over inividual channels
         }
-        if (WOMID[i] >= 0)
-          histChannelSumWOM[WOMID[i]]->Add(&hCh);
       }
 
       /*
-      __ Number of P.E. _____________________________________________________
-      Calculate & save the number of p.e. for an entire WOM.
-      Note: for the 1st WOM of each WC one channel was not recorded.
-      Thus, there are only 7 values from 8. The result for the WOM is therefore
-      scaled up by 8/7 to make the numbers comparable.
+      __ WOM Sums_____________________________________________________
+      2 Possibilities: 
+      1. Add all Waveforms for the woms to 1 big waveform for each wom -> Then use this big waveform and do the same as with a normal waveform-> Integrate Amplitude
+      2. Just sum up all Integrals/Amplitudes for the Channels using the Integral[] or Amplitude[] Arrays
+
+      1 Does produce weird outcomes -> use 2
       */
+      int method = 2;
       for (int i = 0; i < 4; i++)
       {
         womCanvas.cd(i + 1);
@@ -816,11 +835,39 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
+        if (method == 1)
+        {
+          IntegralSum[i] = IntegralHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
+          AmplitudeSum[i] = AmplitudeHist(histChannelSumWOM[i] , integralStartShifted, integralEndShifted,0) /calib_amp.at(i);
+        }
+        else
+        {
 
-        IntegralSum[i] = integral(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
-
-        amplitudeChannelSumWOM[i] = amp_atTime(histChannelSumWOM[i], t_amp);
-
+          if (i == 3)
+          {
+            //WOM D
+            IntegralSum[i] = Integral[0] + Integral[1] + Integral[2] + Integral[3] + Integral[4] + Integral[5] + Integral[6] + Integral[7];
+            AmplitudeSum[i] = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
+          }
+          else if (i == 2)
+          {
+            //WOM C
+            IntegralSum[i] = Integral[8] + Integral[9] + Integral[10] + Integral[11] + Integral[12] + Integral[13] + Integral[14] + Integral[15];
+            AmplitudeSum[i] = Amplitude[8] + Amplitude[9] + Amplitude[10] + Amplitude[11] + Amplitude[12] + Amplitude[13] + Amplitude[14] + Amplitude[15];
+          }
+          else if (i == 1)
+          {
+            //WOM B
+            IntegralSum[i] = (8.0 / 7.0) * (Integral[24] + Integral[25] + Integral[26] + Integral[27] + Integral[28] + Integral[29] + Integral[30]);         //1 Missing -> Trigger
+            AmplitudeSum[i] = (8.0 / 7.0) * (Amplitude[24] + Amplitude[25] + Amplitude[26] + Amplitude[27] + Amplitude[28] + Amplitude[29] + Amplitude[30]); //1 Missing -> Trigger
+          }
+          else if (i == 0)
+          {
+            //WOM A
+            IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
+            AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
+          }
+        }
         float minY = histChannelSumWOM[i]->GetMinimum();
         float maxY = histChannelSumWOM[i]->GetMaximum();
 
@@ -832,13 +879,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         ln4->Draw("same");
         ln5->Draw("same");
 
-        histChannelSumWOM[i]->Scale(calib_amp.at(i));
         chargeChannelSumWOM[i] = IntegralSum[i];
-        // cout << "chargeChannelSum:  " << chargeChannelSumWOM[i]  << endl;
+        amplitudeChannelSumWOM[i] = AmplitudeSum[i];
       }
 
-      // PE_WOM1 = 8 / 7 * (amp[0] + amp[1] + amp[2] + amp[3] + amp[4] + amp[5] + amp[6]);
-      //PE_WOM2 = (amp[7] + amp[8] + amp[9] + amp[10] + amp[11] + amp[12] + amp[13] + amp[14]);
+      if (forcePrintEvent)
+      {
+        forcePrintEvents++;
+      }
 
       /*
       __ TIMING _____
@@ -846,7 +894,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       trigT = t[triggerChannel];
       for (int i = 0; i < runChannelNumberWC; i++)
       {
-        tSiPM[i] = t[i] - trigT;
+        if (i != triggerChannel)
+          tSiPM[i] = t[i] - trigT;
       }
 
       // add-up all events channel-wise, not calibrated
@@ -859,15 +908,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         }
       }
 
-      if (!skipThisEvent && print)
+      if ((forcePrintEvent && print) || (!skipThisEvent && print))
       {
         /*Saving the plotted signals/events to a new page in the .pdf file.*/
-        if ((currentPrint != fileCounter) || (printedExtraEvents < printExtraEvents))
+        if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
         {
-          printedExtraEvents++;
+          if (printExtraEvents)
+            printedExtraEvents++;
           currentPrint = fileCounter;
 
-          if (fileCounter == 0 && fileCounter != (numberOfBinaryFiles - 1))
+          if (fileCounter == 0 && ((fileCounter != (numberOfBinaryFiles - 1)) || forcePrintEvent))
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
             womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf("), "pdf");
@@ -909,7 +959,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     /*Clearing objects and saving files.*/
     inList.close();
 
-    if (numberOfBinaryFiles != 1)
+    if (numberOfBinaryFiles != 1 || forcePrintEvents > 0)
     {
       cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
       womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf)"), "pdf");

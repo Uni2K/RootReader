@@ -37,7 +37,7 @@ string vectorToString(vector<float> vec){
   { 
     // Convert all but the last element to avoid a trailing "," 
     std::copy(vec.begin(), vec.end()-1, 
-        std::ostream_iterator<int>(vts, ", ")); 
+        std::ostream_iterator<float>(vts, ", ")); 
   
     // Now add the last element with no delimiter 
     vts << vec.back(); 
@@ -54,12 +54,11 @@ vector<float> readCalib(string calib_path, string _runName, double initValue)
 {
   FILE *file = fopen(calib_path.c_str(), "r");
   vector<float> calib_amp;
-
   char line[256];
 
   while (fgets(line, sizeof(line), file))
   {
-    if ((strstr(line, _runName.c_str()) != NULL))
+    if ((strstr(line, _runName.c_str()) != NULL) || (strstr(line, "all") != NULL) )
     {
       calib_amp.clear();
       string s = extractValues(line);
@@ -80,14 +79,24 @@ vector<float> readCalib(string calib_path, string _runName, double initValue)
       calibValue = string(s);
 
       calib_amp.push_back(stringToDouble(calibValue));
+     
+     
       break;
     }
   }
   fclose(file);
 
+
+
   for (std::size_t i = calib_amp.size(); i<32; i++)
   {
     calib_amp.push_back(initValue);
   }
+
+
+
+
+
+
   return calib_amp;
 }

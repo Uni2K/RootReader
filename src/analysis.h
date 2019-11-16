@@ -8,18 +8,18 @@ using namespace std;
 
 string checkFilename(TString filename);
 // TIMING
-float CDF(TH1F* hWave,float thr);
-float CFD2(TH1F* hWave,float thr);
-float CDFinvert(TH1F* hWave,float thr);
-float CFDinvert2(TH1F* hWave,float thr);
+float CFD(TH1F* hWave,float thr);
+float CFDNegative(TH1F* hWave,float thr);
+float CFDInRange(TH1F* hWave,float thr,float start,float end);
+float CFDinvert(TH1F* hWave,float thr);
+float CFDinvertInRange(TH1F* hWave,float thr,float start,float end);
 // INTEGRAL
-float Integrate_50ns(TH1F* hWave, float BL);
-float integral(TH1F* hWave,float t1,float t2,float BL);
+float IntegralHist(TH1F* hWave,float t1,float t2,float BL);
 // BASELINE
 float* getBL(TH1F* hWave, float* BL, float t1, float t2);
 float* BL_fit(TH1F* hWave, float* BL_chi2, float t1, float t2);
 // AMPLITUDE
-float PE(TH1F* hWave, float calib_factor, float BL, float t1, float t2);
+float AmplitudeHist(TH1F* hWave,  float t1, float t2,float BL);
 float max_inRange(TH1F* hWave,float t1, float t2);
 float t_max_inRange(TH1F* hWave,float t1, float t2);
 float amp_atTime(TH1F* hWave,float t_max);

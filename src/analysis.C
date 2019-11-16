@@ -35,7 +35,7 @@ string checkFilename(TString filename){
   }
 }
 
-float CDF(TH1F* hWave,float thr){
+float CFD(TH1F* hWave,float thr){
   float peak=hWave->GetMaximum();
   int timePos=1;
   float val = 0;
@@ -52,8 +52,27 @@ float CDF(TH1F* hWave,float thr){
   return  x1+k*(thr*peak-y1);
 }
 
-float CFD2(TH1F* hWave,float thr){
-  hWave->GetXaxis()->SetRange(100./SP,150./SP);
+float CFDNegative(TH1F* hWave,float thr){
+  float peak=abs(hWave->GetMinimum());
+  int timePos=1;
+  float val = 0;
+  while(abs(val)<thr*peak){
+    timePos+=1;
+    val = hWave->GetBinContent(timePos);
+  }
+  
+  double x1 = SP*(timePos-1);
+  double x2 = SP*(timePos);
+  double y1 = hWave->GetBinContent(timePos-1);
+  double y2 = hWave->GetBinContent(timePos);
+  double k = (x2-x1)/(y2-y1);
+  return  x1+k*(thr*peak-y1);
+}
+
+
+
+float CFDInRange(TH1F* hWave,float thr,float start, float end){
+  hWave->GetXaxis()->SetRange(start/SP,end/SP);
   float peak=hWave->GetMaximum();
   int max_bin = hWave->GetMaximumBin();
   int lower_bin = max_bin - 20./SP;
@@ -69,11 +88,11 @@ float CFD2(TH1F* hWave,float thr){
   double x2 = SP*(timePos);
   double y1 = hWave->GetBinContent(timePos-1);
   double y2 = hWave->GetBinContent(timePos);
-  double k = (x2-x1)/(y2-y1);
+  double k = (x2-x1)/(y2-y1); //Genauigkeit erhöhen, ohne nur Bin Genauigkeit
   return  x1+k*(thr*peak-y1);
 }
 
-float CDFinvert(TH1F* hWave,float thr){
+float CFDinvert(TH1F* hWave,float thr){
   float peak=hWave->GetMaximum();
   int timePos=hWave->GetMaximumBin();
   float val = peak;
@@ -90,8 +109,8 @@ float CDFinvert(TH1F* hWave,float thr){
   return  x1+k*(thr*peak-y1);  
 }
 
-float CFDinvert2(TH1F* hWave,float thr){
-  hWave->GetXaxis()->SetRange(100./SP,150./SP);
+float CFDinvertInRange(TH1F* hWave,float thr,float start, float end){
+  hWave->GetXaxis()->SetRange(start/SP,end/SP);
   float peak=hWave->GetMaximum();
   int max_bin = hWave->GetMaximumBin();
   int lower_bin = max_bin - 20./SP;
@@ -111,37 +130,8 @@ float CFDinvert2(TH1F* hWave,float thr){
   return  x1+k*(thr*peak-y1);
 }
 
-float Integrate_50ns(TH1F* hWave, float BL){
-  /*
-  Function to integrate the given histogram for 50ns. The range is defined with respect to the position of the maximum in the intervall from 100 to 150ns.
-  Procedure:
-    - Set the range of the histogram to 100-150ns
-    - Find the bin-number of the maximum in that range
-    - Determine the bins 20ns before maximum and 30ns after maximum
-    - Reset the histogram to full range
-    - Assert that the bins correspond to 50ns range
-    - Integrate the 50ns subtracting the baseline given as input
 
-  Input: TH1F pointer to histogram, BL as float
-  Output: Integral in mV*ns as float
-  */
-
-  hWave->GetXaxis()->SetRange(100.0/SP,150.0/SP); //set range to 100-150ns
-  int max_bin = hWave->GetMaximumBin(); //bin-number corresponding to maximum in range 100-150ns
-  int lower_bin = max_bin - 20.0/SP; //lower integration-limit set to 20ns before maximum
-  int upper_bin = max_bin + 30.0/SP; //upper integration-limit set to 30ns before maximum
-  hWave->GetXaxis()->SetRange(0,1024); //back to full range
-
-  //consistency-check for 50ns integration range
-  float lower_time = hWave->GetXaxis()->GetBinCenter(lower_bin);
-  float upper_time = hWave->GetXaxis()->GetBinCenter(upper_bin);
-  assert((upper_time-lower_time)==50.0);
-
-  //return 50ns integral with subtracted baseline 
-  return hWave->Integral(lower_bin, upper_bin, "width") - BL*50.0;
-}
-
-float integral(TH1F* hWave,float t1,float t2,float BL){
+float IntegralHist(TH1F* hWave,float t1,float t2,float BL){
   float BW = hWave->GetXaxis()->GetBinWidth(1);
   int bin1 = hWave->FindBin(t1);
   int bin2 = hWave->FindBin(t2);
@@ -197,11 +187,10 @@ float* BL_fit(TH1F* hWave, float* BL_chi2, float t1, float t2){
 
 /*
 __ Get Amplitude ________________________________________
-Returns amplitude value of maximum in 100-150 ns window
 using a constant fit over a 0.5 ns range around the maximum.
 Value is basline-corrected and converted to units of p.e. 
 */
-float PE(TH1F* hWave, float calib_factor, float BL, float t1, float t2){
+float AmplitudeHist(TH1F* hWave, float t1, float t2,float BL){
   TF1* f1 = new TF1("f1","pol0",100,300);
   double r1=0;
   double r2=0;
@@ -211,7 +200,7 @@ float PE(TH1F* hWave, float calib_factor, float BL, float t1, float t2){
   r2=r1+1;
 
   hWave->Fit("f1","QN","",r1,r2);
-  float pe = (f1->GetParameter(0) - BL) / calib_factor;
+  float pe = (f1->GetParameter(0) - BL);
   hWave->GetXaxis()->SetRange(1,1024);
 
   return pe;
