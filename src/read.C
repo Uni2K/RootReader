@@ -81,12 +81,13 @@ bool newerVersion = false;
 // SWITCH dynamic <-> constant baseline
 bool switch_BL = false; // true = dyn, false = const
 //Integration Window
-bool isDC = true;
+bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 150; //Testbeam: 100, 125 charge, 100-150
-float integralEnd = 200;
-int triggerChannel = 9; //starting from 1 -> Calib: 9, Testbeam '18: 15
+float integralStart = 120; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
+float integralEnd = 160;
+
+int triggerChannel = 31; //starting from 0 -> Calib: 7?, Testbeam '18: 15, 
 int plotGrid = 5;
 
 int maximalExtraPrintEvents = 0;
@@ -181,11 +182,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     calib_amp = readCalib(calib_path_amp, runName, 1);
   if (isCalibrated)
     calib_charge = readCalib(calib_path_charge, runName, 1);
- if (!switch_BL)
+  if (!switch_BL)
     BL_const = readCalib(calib_path_bl, runName, 0);
-
-
-
 
   /*Create root-file and root-tree for data*/
   TFile *rootFile = new TFile(_outFile, "RECREATE");
@@ -393,13 +391,32 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
-  std::ifstream countStream(_inFileList);
+  //Get Binary File Count
+  ifstream countStream(_inFileList);
   numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
                               std::istreambuf_iterator<char>(), '\n');
-  //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
+  countStream.close();
 
-  if (numberOfBinaryFiles > 1)
+  //Get First Line File Name-> for printing
+  string tempFileName;
+  ifstream tempName(_inFileList);
+  if (tempName.good())
   {
+    getline(tempName, tempFileName);
+  }
+  tempName.close();
+
+  //cout << "Number of Binary Files: " << numberOfBinaryFiles << endl;
+  bool printParameterOverview = false;
+  if (tempFileName.substr(tempFileName.find_last_of(".") + 1) == "bin")
+  {
+    printParameterOverview = true;
+  }
+
+  if (numberOfBinaryFiles > 1 || printParameterOverview)
+  {
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::RUN PARAMETER:::::::::::::::::::::::::::::::::::::::" << endl;
     cout << "RunNr: " << runNumber << endl;
@@ -417,6 +434,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     cout << "Amplitude Calibration: " << vectorToString(calib_amp) << endl;
     cout << "Charge Calibration: " << vectorToString(calib_charge) << endl;
     cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(isCalibrated) << endl;
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
   }
 
@@ -463,7 +483,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       {
         newerVersion = true;
       }
-      if (numberOfBinaryFiles > 1)
+      if (numberOfBinaryFiles > 1 || printParameterOverview)
         cout << "VERSION: " << softwareVersion << " HEADERSIZE: " << headerSize << "  Newer Version: " << newerVersion << endl;
     }
 
@@ -747,8 +767,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           float integralEndShifted = integralEnd;
         }
 
-        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted,BL_shift) / calib_charge.at(i);
-        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted,BL_shift) / calib_amp.at(i);
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(i);
 
         //TESTBEAM 2018
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
@@ -835,10 +855,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
+         if (isDC)
+        {
+          //Always the same interval
+          float integralStartShifted = integralStart;
+          float integralEndShifted = integralEnd;
+        }
+        
         if (method == 1)
         {
           IntegralSum[i] = IntegralHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
-          AmplitudeSum[i] = AmplitudeHist(histChannelSumWOM[i] , integralStartShifted, integralEndShifted,0) /calib_amp.at(i);
+          AmplitudeSum[i] = AmplitudeHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_amp.at(i);
         }
         else
         {

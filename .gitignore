@@ -9,3 +9,4 @@ src/mergeROOTFiles
 mergeROOTFiles
 RootRunlist.txt
 config.txt
+save/

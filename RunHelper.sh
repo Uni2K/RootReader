@@ -297,11 +297,11 @@ readFast() {
 
     time (
         while read line; do
-            #  echo $line
+           # echo $line
             [[ $line == \#* ]] && continue #Wenn die Zeile leer ist wird "continue" ausgeführt
             lineArr=($line)
             if [ "${lineArr[0]}" = "$runNr" ] || [ $readAll = true ]; then #lineArr ist ein Array aus jeder Zeile, getrennt durch Leerzeichen. linearray[0] ist die Run NUMMER
-
+                rootFileList=""
                 runName=${lineArr[1]}
 
                 runDir=$saveFolder/$runName
@@ -425,6 +425,7 @@ saveConfig() {
     echo "$isDC" >>"$destdir"
     echo "$dynamicBL" >>"$destdir"
     echo "$useCalibValues" >>"$destdir"
+    echo "$useExistingRunList" >>"$destdir"
 
     echo "config saved!"
 
@@ -443,6 +444,7 @@ loadConfig() {
         isDC=$(awk 'NR == 6' config.txt)
         dynamicBL=$(awk 'NR == 7' config.txt)
         useCalibValues=$(awk 'NR == 8' config.txt)
+        useExistingRunList=$(awk 'NR == 9' config.txt)
 
         if [ "$readMode" = "1" ]; then
                 runMode="Fast"

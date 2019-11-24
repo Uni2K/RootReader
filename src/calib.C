@@ -60,6 +60,7 @@ vector<float> readCalib(string calib_path, string _runName, double initValue)
   {
     if ((strstr(line, _runName.c_str()) != NULL) || (strstr(line, "all") != NULL) )
     {
+     // std::cout<<"cLL"<< _runName<<line<<calib_path<<std::endl;
       calib_amp.clear();
       string s = extractValues(line);
       string delimiter = ",";
@@ -81,7 +82,7 @@ vector<float> readCalib(string calib_path, string _runName, double initValue)
       calib_amp.push_back(stringToDouble(calibValue));
      
      
-      break;
+      //break;
     }
   }
   fclose(file);
