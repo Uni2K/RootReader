@@ -84,10 +84,10 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 150; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
-float integralEnd = 200;
+float integralStart = 120; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
+float integralEnd = 2000;
 
-int triggerChannel = 31; //starting from 0 -> Calib: 7?, Testbeam '18: 15, Important for timing tSipm,...
+int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
 int plotGrid = 5;
 
 int maximalExtraPrintEvents = 0;

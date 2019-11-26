@@ -304,6 +304,12 @@ readFast() {
     rootFileList=""
 
 
+
+   
+
+
+
+
    # " ${runNr[@]} " =~ " ${lineArr[0]} "
 
 
@@ -624,11 +630,41 @@ while true; do
 
         \
             "RunNumber ($runNumber)")
-            echo "Enter a runNumber (ALL=a, Example: 22 OR multiple: 31,32,40)"
-            read runNumber
-             runNumber=($(echo "$runNumber" | tr ',' '\n'))
+            echo "Enter a runNumber (ALL=a, Example: 22 OR multiple: 31,32,40 OR range: 10-15 OR combined)"
+            read runNumberRaw
+             runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
     	    # echo "${runNumber[*]}"
 
+            for i in "${runNumberRaw[@]}"
+                do
+            : 
+        if [[ $i == *"-"* ]]; then
+             range=($(echo $i | tr "-" "\n"))
+             startValue=${range[0]}
+             endValue=${range[1]}
+            
+            while [ $startValue -le $endValue ]
+            do
+            runNumberRaw=("$startValue" "${runNumberRaw[@]}")
+            startValue=$[$startValue+1]
+            done
+        fi
+
+
+        #Remove Range
+        unset runNumber
+        for z in "${runNumberRaw[@]}"
+                do
+        : 
+        if [[ $z != *"-"* ]]; then
+            runNumber=("$z" "${runNumber[@]}")
+        fi
+        done
+
+
+
+
+        done
             break
             ;;
 
