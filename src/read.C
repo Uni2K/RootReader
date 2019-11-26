@@ -84,10 +84,10 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 120; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
-float integralEnd = 160;
+float integralStart = 150; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
+float integralEnd = 200;
 
-int triggerChannel = 31; //starting from 0 -> Calib: 7?, Testbeam '18: 15, 
+int triggerChannel = 31; //starting from 0 -> Calib: 7?, Testbeam '18: 15, Important for timing tSipm,...
 int plotGrid = 5;
 
 int maximalExtraPrintEvents = 0;
@@ -99,9 +99,15 @@ int skippedCount = 0;
 //Skip events with bad baseline
 bool allowBaselineEventSkipping = false;
 int skipInChannel = 0;
-//Skip events that exceed the WC maximum
+//Skip events that exceed the WC maximum, does not include TriggerChannel
 bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 650;
+
+//Skip veto events -> if channel sees something-> Skip
+bool allowVetoSkipping = true;
+int vetoChannel = 9;
+int vetoThreshold=5; //abs Value -> compares with Amplitude
+
 
 //Allow Force Printing individual events
 bool forcePrintEvent = false;
@@ -631,7 +637,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         //Exceeding Events Skipping
         if (allowExceedingEventSkipping && !skipThisEvent)
         {
-          if (max[i] > exceedingThreshold)
+          if (i != triggerChannel && max[i] > exceedingThreshold)
           {
             // cout << "EXCEEDING: " << max[i]  <<" CHANNEL: " <<i << endl;
             skipThisEvent = true;
@@ -749,11 +755,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         /*
         __ Integral & Amplitude ________________________________________
-        There are several definitions of the integral of a signal used here. Those are:
-        - Integral_0_300: Integration over the entire time window (~320ns)
-        - Integral: Integration over a smaller time window (~50ns) relative to the trigger
-        Additionally the number of p.e. is now calculated using the amplitude
-        and the calibration factors in the calib_amp-vactor. The function 'PE' calculates the amplitude of the signal, subtracts the better BL value and divides by the calibration factor.
         */
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
@@ -769,6 +770,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
         Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(i);
+
+        if(allowVetoSkipping && i==vetoChannel){
+         float ampForVeto= AmplitudeHist(&hCh, 0, 300, 0); //Search Everywhere
+         if( ampForVeto>vetoThreshold){
+           skipThisEvent=true;
+           //forcePrintEvent=true;
+         }
+        }
+
+
 
         //TESTBEAM 2018
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
@@ -800,9 +811,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           histChannelSumWOM[WOMID[i]]->Add(&hCh);
         /*
         __ Printing Wafevorms ____________________________________________
-        The signals for events can be printed to a .pdf file called waves.pdf. The rate at which the events are drawn to waves.pdf is set via the variable wavesPrintRate. Additional requirements can be set in the if-statement to look at specific events only.
-        The entire if-statement so far also plots lines at the found signal maximum, the corresponding integration limit, as well as the BL values to each of the histograms.
-        */
+       */
         if (print)
         {
           if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
@@ -844,7 +853,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       1. Add all Waveforms for the woms to 1 big waveform for each wom -> Then use this big waveform and do the same as with a normal waveform-> Integrate Amplitude
       2. Just sum up all Integrals/Amplitudes for the Channels using the Integral[] or Amplitude[] Arrays
 
-      1 Does produce weird outcomes -> use 2
+      1 Does produce weird outcomes -> use 2, 1 stays for 
       */
       int method = 2;
       for (int i = 0; i < 4; i++)

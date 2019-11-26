@@ -219,17 +219,25 @@ readFull() {
     echo "$4"
     echo "$saveFolder"
 
-    if [ "$runNr" = "a" ]; then
-        readAll=true
+   if [[ " ${runNumber[@]} " =~ "a" ]]; then
+               readAll=true
     fi
+
     mkdir "$saveFolder"
 
     while read line; do
         [[ $line == \#* ]] && continue
         lineArr=($line)
-        echo "$lineArr"
+       
+       
+            doRun="0"
+            if [[ " ${runNumber[@]} " =~ " ${lineArr[0]} " ]]; then
+               # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]} 
+                doRun="1"
+            fi
 
-        if [ "${lineArr[0]}" = "$runNr" ] || [ $readAll = true ]; then
+             
+            if [ "$doRun" = "1" ] || [ $readAll = true ]; then
             runName=${lineArr[1]}
             runDir=$saveFolder/$runName
             mkdir "$runDir"
@@ -281,26 +289,39 @@ readFast() {
     installPDFUnite
     compileMerger
     maxThreads=9
-    runNr=$1
     readAll=false
     inFolder=$2
     outFolder=$3
     headerSize=$4
     saveFolder=$outFolder/Fast/
 
-    if [ "$runNr" = "a" ]; then
-        readAll=true
+    if [[ " ${runNumber[@]} " =~ "a" ]]; then
+               readAll=true
     fi
+
     mkdir "$saveFolder"
 
     rootFileList=""
+
+
+   # " ${runNr[@]} " =~ " ${lineArr[0]} "
+
 
     time (
         while read line; do
            # echo $line
             [[ $line == \#* ]] && continue #Wenn die Zeile leer ist wird "continue" ausgeführt
             lineArr=($line)
-            if [ "${lineArr[0]}" = "$runNr" ] || [ $readAll = true ]; then #lineArr ist ein Array aus jeder Zeile, getrennt durch Leerzeichen. linearray[0] ist die Run NUMMER
+       
+
+            doRun="0"
+            if [[ " ${runNumber[@]} " =~ " ${lineArr[0]} " ]]; then
+               # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]} 
+                doRun="1"
+            fi
+
+             
+            if [ "$doRun" = "1" ] || [ $readAll = true ]; then #lineArr ist ein Array aus jeder Zeile, getrennt durch Leerzeichen. linearray[0] ist die Run NUMMER
                 rootFileList=""
                 runName=${lineArr[1]}
 
@@ -543,7 +564,7 @@ while true; do
     echo "-------------------------------------------------------"
     echo "-------------------------------------------------------"
 
-    select yn in "Start" "RunMode ($runMode)" "RunNumber ($runNumber)" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Load Config" "Save Config" "Informations"; do
+    select yn in "Start" "RunMode ($runMode)" "RunNumber (${runNumber[*]})" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Load Config" "Save Config" "Informations"; do
         case $yn in
 
         "RunList Naming Schema ($nameSchema)")
@@ -603,8 +624,11 @@ while true; do
 
         \
             "RunNumber ($runNumber)")
-            echo "Enter a runNumber (ALL=a, Example: 22)"
+            echo "Enter a runNumber (ALL=a, Example: 22 OR multiple: 31,32,40)"
             read runNumber
+             runNumber=($(echo "$runNumber" | tr ',' '\n'))
+    	    # echo "${runNumber[*]}"
+
             break
             ;;
 
