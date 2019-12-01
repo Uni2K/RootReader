@@ -15,6 +15,7 @@
 #include <sstream>
 //specific
 #include "calib.h"
+#include <fstream>
 
 using namespace std;
 string extractValues(string str)
@@ -30,37 +31,35 @@ double stringToDouble(string text)
   return stod(text);
 }
 
-string vectorToString(vector<float> vec){
- std::ostringstream vts; 
-  
-  if (!vec.empty()) 
-  { 
-    // Convert all but the last element to avoid a trailing "," 
-    std::copy(vec.begin(), vec.end()-1, 
-        std::ostream_iterator<float>(vts, ", ")); 
-  
-    // Now add the last element with no delimiter 
-    vts << vec.back(); 
-  } 
+string vectorToString(vector<float> vec)
+{
+  std::ostringstream vts;
+
+  if (!vec.empty())
+  {
+    // Convert all but the last element to avoid a trailing ","
+    std::copy(vec.begin(), vec.end() - 1,
+              std::ostream_iterator<float>(vts, ", "));
+
+    // Now add the last element with no delimiter
+    vts << vec.back();
+  }
   return vts.str();
-
 }
-
-
-
 
 /******** FUNCTIONS ********/
 vector<float> readCalib(string calib_path, string _runName, double initValue)
 {
-  FILE *file = fopen(calib_path.c_str(), "r");
+  std::ifstream infile(calib_path.c_str());
   vector<float> calib_amp;
-  char line[256];
 
-  while (fgets(line, sizeof(line), file))
+  std::string line;
+
+  while (std::getline(infile, line))
   {
-    if ((strstr(line, _runName.c_str()) != NULL) || (strstr(line, "all") != NULL) )
+    if ((line.find(_runName) != std::string::npos) || (line.find("all") != std::string::npos))
     {
-     // std::cout<<"cLL"<< _runName<<line<<calib_path<<std::endl;
+
       calib_amp.clear();
       string s = extractValues(line);
       string delimiter = ",";
@@ -80,24 +79,15 @@ vector<float> readCalib(string calib_path, string _runName, double initValue)
       calibValue = string(s);
 
       calib_amp.push_back(stringToDouble(calibValue));
-     
-     
-      //break;
     }
   }
-  fclose(file);
 
+  infile.close();
 
-
-  for (std::size_t i = calib_amp.size(); i<32; i++)
+  for (std::size_t i = calib_amp.size(); i < 32; i++)
   {
     calib_amp.push_back(initValue);
   }
-
-
-
-
-
 
   return calib_amp;
 }

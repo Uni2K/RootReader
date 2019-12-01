@@ -288,7 +288,7 @@ readFast() {
     fi
     installPDFUnite
     compileMerger
-    maxThreads=9
+    maxThreads=6
     readAll=false
     inFolder=$2
     outFolder=$3

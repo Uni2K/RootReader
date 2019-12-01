@@ -51,7 +51,7 @@ Int_t runPosition = -999;
 Float_t runEnergy = -999;
 Int_t runAngle = -999;
 Int_t runNumber = -999;
-Int_t runChannelNumberWC = 32;
+Int_t runChannelNumberWC = 9;
 /*Declare & define the variables that are to be saved in the root-tree or that are used during the analysis.*/
 Int_t EventNumber = -999;
 Int_t LastEventNumber = -999;
@@ -84,11 +84,11 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 120; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
-float integralEnd = 2000;
+float integralStart = 165; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
+float integralEnd = integralStart+25;
 
 int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
-int plotGrid = 5;
+int plotGrid = 3;
 
 int maximalExtraPrintEvents = 0;
 int printedExtraEvents = 0;
@@ -104,11 +104,17 @@ bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 650;
 
 //Skip veto events -> if channel sees something-> Skip
-bool allowVetoSkipping = true;
+bool allowVetoSkipping = false;
 int vetoChannel = 9;
-int vetoThreshold=5; //abs Value -> compares with Amplitude
+int vetoThreshold = 5; //abs Value -> compares with Amplitude
+
+//Determine Charge by the peak found in the [integralStart, integralEnd] interval with a fixed size of 25ns, if off -> make sure the interval is 25ns or nothing is comparable
+//Do not enable this -> this leads to a bias of the 0.NPE Peak (empty waveforms will have always the maximum)
+bool enablePeakFinder =false; 
 
 
+
+bool enableBaselineCorrection =true;
 //Allow Force Printing individual events
 bool forcePrintEvent = false;
 int maximalForcePrintEvents = 5;
@@ -702,9 +708,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
           BL_shift = BL_const[i];
         }
-
+        if (!enableBaselineCorrection)
+          BL_shift = 0;
         /*
-        __ Peakfinder _________________________________________________________
+        __ Peakfinder / Unused _________________________________________________________
         Implemented to search double-muon-event candiates
         Set maximum number of peaks stored in beginning of script -> nPeaks
         peakX/Yarray[nCh][nPeaks] stores peak coordinates as branches in tree
@@ -761,25 +768,25 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
 
-        if (isDC)
+        if (isDC || !enablePeakFinder)
         {
           //Always the same interval
-          float integralStartShifted = integralStart;
-          float integralEndShifted = integralEnd;
+          integralStartShifted = integralStart;
+          integralEndShifted = integralEnd;
         }
 
         Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
         Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(i);
 
-        if(allowVetoSkipping && i==vetoChannel){
-         float ampForVeto= AmplitudeHist(&hCh, 0, 300, 0); //Search Everywhere
-         if( ampForVeto>vetoThreshold){
-           skipThisEvent=true;
-           //forcePrintEvent=true;
-         }
+        if (allowVetoSkipping && i == vetoChannel)
+        {
+          float ampForVeto = AmplitudeHist(&hCh, 0, 300, 0); //Search Everywhere
+          if (ampForVeto > vetoThreshold)
+          {
+            skipThisEvent = true;
+            //forcePrintEvent=true;
+          }
         }
-
-
 
         //TESTBEAM 2018
         //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
@@ -817,7 +824,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
           {
             cWaves.cd(i + 1);
-            hCh.DrawCopy();
+            hCh.DrawCopy("HIST"); //No error bars pls
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
             int max_bin = hCh.GetMaximumBin();
             int lower_bin = max_bin - 20.0 / SP;
@@ -828,12 +835,30 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             float upper_time = hCh.GetXaxis()->GetBinCenter(upper_bin);
             hCh.GetXaxis()->SetRange(0, 1024);
             TLine *ln4 = new TLine(0, BL_lower[i], 75, BL_lower[i]);
-            TLine *ln5 = new TLine(220, BL_upper[i], 320, BL_upper[i]);
+            TLine *ln5 = new TLine(270, BL_upper[i], 320, BL_upper[i]);
             TText *text = new TText(.5, .5, Form("%f %f", BL_lower[i], BL_upper[i]));
             ln4->SetLineColor(2);
             ln5->SetLineColor(2);
+
+            TLine *baselineUsed = new TLine(0, BL_shift, 320, BL_shift);
+            baselineUsed->SetLineColor(3);
+            baselineUsed->SetLineWidth(4);
+
+            float minY = hCh.GetMinimum();
+            float maxY = hCh.GetMaximum();
+
+            TLine *leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
+            TLine *rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+
+            leftInterval->SetLineColor(2);
+            rightInterval->SetLineColor(2);
+
+            baselineUsed->Draw("same");
             ln4->Draw("same");
             ln5->Draw("same");
+            leftInterval->Draw("same");
+            rightInterval->Draw("same");
+
             text->Draw("same");
             if (pfON)
             {
@@ -864,13 +889,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
         float integralStartShifted = t_amp - 10;
         float integralEndShifted = t_amp + 15;
-         if (isDC)
+        if (isDC || !enablePeakFinder)
         {
           //Always the same interval
-          float integralStartShifted = integralStart;
-          float integralEndShifted = integralEnd;
+          integralStartShifted = integralStart;
+          integralEndShifted = integralEnd;
         }
-        
+
         if (method == 1)
         {
           IntegralSum[i] = IntegralHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
