@@ -51,7 +51,7 @@ Int_t runPosition = -999;
 Float_t runEnergy = -999;
 Int_t runAngle = -999;
 Int_t runNumber = -999;
-Int_t runChannelNumberWC = 9;
+Int_t runChannelNumberWC = 16;
 /*Declare & define the variables that are to be saved in the root-tree or that are used during the analysis.*/
 Int_t EventNumber = -999;
 Int_t LastEventNumber = -999;
@@ -84,8 +84,8 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 165; //Testbeam: 100, 125 charge, 100-150, 2019: 120-160, Calib: 150-200
-float integralEnd = integralStart+25;
+float integralStart = 165; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
+float integralEnd = integralStart + 25;
 
 int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
 int plotGrid = 3;
@@ -110,11 +110,9 @@ int vetoThreshold = 5; //abs Value -> compares with Amplitude
 
 //Determine Charge by the peak found in the [integralStart, integralEnd] interval with a fixed size of 25ns, if off -> make sure the interval is 25ns or nothing is comparable
 //Do not enable this -> this leads to a bias of the 0.NPE Peak (empty waveforms will have always the maximum)
-bool enablePeakFinder =false; 
+bool enablePeakFinder = false;
 
-
-
-bool enableBaselineCorrection =true;
+bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
 bool forcePrintEvent = false;
 int maximalForcePrintEvents = 5;
@@ -403,6 +401,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
+
+
   //Get Binary File Count
   ifstream countStream(_inFileList);
   numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
@@ -523,7 +523,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       word = strtok(NULL, " \n");
     }
 
-    if (nActiveCh > 9 || newerVersion)
+    if (true || nActiveCh > 9 || newerVersion) //Not sure why reading this byte, //if (nActiveCh > 9 || newerVersion), needs to be read in all versions 2.8.14+
     {
       char dummy;
       nitem = fread(&dummy, 1, 1, pFILE);
@@ -533,6 +533,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     /*Loop over events. Events are processed and analysed one by one in order.*/
     while (nitem > 0)
     { //event loop
+
       skipThisEvent = false;
       forcePrintEvent = false;
       std::vector<TObject *> eventTrash;
@@ -555,6 +556,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       {
         printf("Percentage: %lf, EventNr: %d, nCh: %d+   \n", ftell(pFILE) / totFileSizeByte, EventNumber, nCh);
       }
+
 
       float MeasuredBaseline[runChannelNumberWC];
       float AmplitudeValue[runChannelNumberWC];
@@ -590,7 +592,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         __ Set WOMID _________________________________________________________
         The labeling of the WOMs in the box was done using the letters A,B,C,D. For convinience these letters are here replaced by the numbers 1-4 which is stored in the root-tree for every channel and every event.
         */
-
         if (i < 8)
         {
           WOMID[i] = 3;
@@ -611,6 +612,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
           WOMID[i] = -1;
         }
+        if(i==triggerChannel) WOMID[i] = -1;
         TString title("");
         title.Form("ch %d, ev %d, wom %d", i, EventNumber, WOMID[i]);
         hCh.Reset();
@@ -653,6 +655,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             skipThisEvent = false;
           }
         }
+
         /*
         __ Baseline Fit _______________________________________________________
         Calculate baseline values infront and after the triggered signal
@@ -775,8 +778,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           integralEndShifted = integralEnd;
         }
 
-        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
-        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(i);
+
+       int shiftedIndex=i+3*8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
+       if(shiftedIndex==32)shiftedIndex=31;
+       // cout<<"INDEX" <<i<<" SHIFTED INDEX: "<<shiftedIndex<<"  VALUE: "<<calib_charge.at(shiftedIndex)<<endl;
+
+
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(shiftedIndex);
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(shiftedIndex);
 
         if (allowVetoSkipping && i == vetoChannel)
         {
@@ -859,6 +868,12 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             leftInterval->Draw("same");
             rightInterval->Draw("same");
 
+            TLegend *h_leg = new TLegend(0.77, 0.67, 0.96, 0.77);
+            h_leg->AddEntry((TObject *)0, Form("Integral: %f", Integral[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Amplitude: %f", Amplitude[i]), "");
+
+            h_leg->Draw();
+
             text->Draw("same");
             if (pfON)
             {
@@ -874,13 +889,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
       /*
       __ WOM Sums_____________________________________________________
-      2 Possibilities: 
-      1. Add all Waveforms for the woms to 1 big waveform for each wom -> Then use this big waveform and do the same as with a normal waveform-> Integrate Amplitude
-      2. Just sum up all Integrals/Amplitudes for the Channels using the Integral[] or Amplitude[] Arrays
+       Just sum up all Integrals/Amplitudes for the Channels using the Integral[] or Amplitude[] Arrays
 
-      1 Does produce weird outcomes -> use 2, 1 stays for 
       */
-      int method = 2;
       for (int i = 0; i < 4; i++)
       {
         womCanvas.cd(i + 1);
@@ -896,14 +907,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           integralEndShifted = integralEnd;
         }
 
-        if (method == 1)
-        {
-          IntegralSum[i] = IntegralHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_charge.at(i);
-          AmplitudeSum[i] = AmplitudeHist(histChannelSumWOM[i], integralStartShifted, integralEndShifted, 0) / calib_amp.at(i);
-        }
-        else
-        {
-
+      
           if (i == 3)
           {
             //WOM D
@@ -928,7 +932,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
             AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
           }
-        }
+        
         float minY = histChannelSumWOM[i]->GetMinimum();
         float maxY = histChannelSumWOM[i]->GetMaximum();
 
