@@ -139,6 +139,58 @@ float IntegralHist(TH1F* hWave,float t1,float t2,float BL){
   float c2 = hWave->GetBinContent(bin2);
   return hWave->Integral(bin1,bin2,"width")-BL*(t2-t1)-c1*(t1-hWave->GetXaxis()->GetBinLowEdge(bin1))-c2*(hWave->GetXaxis()->GetBinUpEdge(bin2)-t2);
 }
+float IntegralHistCFD(TH1F* hWave,float threshold,float windowInNs,float BL){
+  float BW = hWave->GetXaxis()->GetBinWidth(1);
+  int bin1 = CFD(hWave,threshold);
+  int bin2 = bin1+(windowInNs/SP);
+  float t1=bin1*SP;
+      float t2=     bin2*SP;
+  float c1 = hWave->GetBinContent(bin1);
+  float c2 = hWave->GetBinContent(bin2);
+  return hWave->Integral(bin1,bin2,"width")-BL*(t2-t1)-c1*(t1-hWave->GetXaxis()->GetBinLowEdge(bin1))-c2*(hWave->GetXaxis()->GetBinUpEdge(bin2)-t2);
+}
+/**
+ * Time over the defined threshold
+ * Get first bin above and last bin above -> Difference
+ * Or more accurate probably: Detect if there are multiple peaks when 
+ * */
+float IntegralTimeOverThreshold(TH1F* hWave,float startSearch,float endSearch,float threshold, float BL){
+  float BW = hWave->GetXaxis()->GetBinWidth(1);
+  int startBin=hWave->FindBin(startSearch);
+  int endBin=hWave->FindBin(endSearch);
+  float maximum=max_inRange(hWave,startSearch,endSearch);
+  float maximumAll=hWave->GetMaximum();
+  int cursor=startBin;
+  int timeOverThreshold=0;
+  float integralOverThreshold=0;
+  float amplitude =0;
+  float th=(maximum*threshold);
+  while(cursor<=endBin){
+   //Iterate through search Interval
+    amplitude=hWave->GetBinContent(cursor)-BL;
+    if(amplitude>th){
+      timeOverThreshold++;
+      integralOverThreshold=integralOverThreshold+amplitude;
+
+    }else if(timeOverThreshold>4){
+    //  std::cout<<"START: "<<startBin<<"  END: "<<endBin<<" CURSOR: "<<cursor<< "INTEGRAL:" <<integralOverThreshold<<" Threshold: "<<th<<" MAXIMUM: "<<maximum<<" MAXIMUMALL"<<maximumAll<<" AMPLITUDE: "<<amplitude<<" TOT: "<<timeOverThreshold<<std::endl;
+      break;
+      
+    }
+   
+    
+
+  cursor++;
+  }
+
+  if(integralOverThreshold<5){
+    integralOverThreshold=-999;
+  }
+  return integralOverThreshold;
+
+}
+
+
 
 float* getBL(TH1F* hWave, float* BL, float t1, float t2){
   /*
@@ -205,6 +257,15 @@ float AmplitudeHist(TH1F* hWave, float t1, float t2,float BL){
 
   return pe;
 }
+
+float AmplitudeHistAlternative(TH1F* hWave, float t1, float t2,float BL){
+
+  hWave->GetXaxis()->SetRange(t1/SP,t2/SP); //window from 100ns-150ns
+  float pe= hWave->GetMaximum();
+  hWave->GetXaxis()->SetRange(1,1024);
+  return pe;
+}
+
 
 
 /*

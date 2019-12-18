@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 
   // runNr=atoi(argv[4]);
   //WCVersion = "AB";
-  //cout << WCVersion << endl;
 
   read(inFileList, inDataFolder, outFile, runName, headerSize,dynamicBL_,isDC_,useConstCalibValues_,runParameterJoined);
   //}

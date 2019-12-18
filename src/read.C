@@ -84,7 +84,7 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 165; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
+float integralStart = 170; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
 float integralEnd = integralStart + 25;
 
 int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
@@ -112,6 +112,20 @@ int vetoThreshold = 5; //abs Value -> compares with Amplitude
 //Do not enable this -> this leads to a bias of the 0.NPE Peak (empty waveforms will have always the maximum)
 bool enablePeakFinder = false;
 
+//timeOverThreshold
+bool enableToT = true;
+float totThreshold = 0.3;
+float totIntervalStart = 100;
+float totIntervalEnd = 200;
+
+bool enableCFDIntegral = true;
+float integralCFDThreshold = 0.3;
+float integralCFDWindow = 25;
+float cfdSearchStart = 100;
+float cfdSearchEnd = 200;
+
+bool zoomedInWaves = true;
+
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
 bool forcePrintEvent = false;
@@ -120,10 +134,12 @@ int forcePrintEvents = 0;
 
 void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
 {
+
   gErrorIgnoreLevel = defaultErrorLevel;
   std::vector<std::string> runParams;
   std::string token;
   std::istringstream tokenStream(runParameter);
+
   char split_char = ',';
   while (std::getline(tokenStream, token, split_char))
   {
@@ -134,15 +150,50 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   try
   {
     runNumber = stoi(runParams[0]);
-    runPosition = stoi(runParams[1]);
-    runAngle = stoi(runParams[2]);
-    runEnergy = stoi(runParams[3]);
-    runChannelNumberWC = stoi(runParams[4]);
   }
   catch (const std::exception &e)
   {
-    // std::cerr << e.what() << '\n';
+    //  std::cerr <<"Error at runNumber:" <<e.what() << '\n';
   }
+
+  try
+  {
+    runPosition = stoi(runParams[1]);
+  }
+  catch (const std::exception &e)
+  {
+    // std::cerr <<"Error at runPosition:" <<e.what() << '\n';
+  }
+
+  try
+  {
+    runAngle = stoi(runParams[2]);
+  }
+  catch (const std::exception &e)
+  {
+    // std::cerr <<"Error at runAngle:" <<e.what() << '\n';
+  }
+
+  try
+  {
+    runEnergy = stoi(runParams[3]);
+  }
+  catch (const std::exception &e)
+  {
+    //  std::cerr <<"Error at runEnergy:" <<e.what() << '\n';
+  }
+
+  try
+  {
+    if (runParams.size() > 4)
+      runChannelNumberWC = stoi(runParams[4]);
+  }
+  catch (const std::exception &e)
+  {
+
+    // std::cerr <<"Error at runChannelNr:" <<e.what() << '\n';
+  }
+
   plotGrid = ceil(sqrt(runChannelNumberWC));
 
   if (dynamicBL_ == "0")
@@ -401,8 +452,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   inList.open(_inFileList);
   assert(inList.is_open());
 
-
-
   //Get Binary File Count
   ifstream countStream(_inFileList);
   numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
@@ -557,7 +606,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         printf("Percentage: %lf, EventNr: %d, nCh: %d+   \n", ftell(pFILE) / totFileSizeByte, EventNumber, nCh);
       }
 
-
       float MeasuredBaseline[runChannelNumberWC];
       float AmplitudeValue[runChannelNumberWC];
       float ComputedCharge[runChannelNumberWC];
@@ -612,7 +660,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
           WOMID[i] = -1;
         }
-        if(i==triggerChannel) WOMID[i] = -1;
+        if (i == triggerChannel)
+          WOMID[i] = -1;
         TString title("");
         title.Form("ch %d, ev %d, wom %d", i, EventNumber, WOMID[i]);
         hCh.Reset();
@@ -778,13 +827,35 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           integralEndShifted = integralEnd;
         }
 
+        int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
+        if (shiftedIndex == 32)
+          shiftedIndex = 31;
+        // cout<<"INDEX" <<i<<" SHIFTED INDEX: "<<shiftedIndex<<"  VALUE: "<<calib_charge.at(shiftedIndex)<<endl;
 
-       int shiftedIndex=i+3*8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
-       if(shiftedIndex==32)shiftedIndex=31;
-       // cout<<"INDEX" <<i<<" SHIFTED INDEX: "<<shiftedIndex<<"  VALUE: "<<calib_charge.at(shiftedIndex)<<endl;
+        if (enableToT)
+        {
+          Integral[i] = IntegralTimeOverThreshold(&hCh, totIntervalStart, totIntervalEnd, totThreshold, BL_shift) / calib_charge.at(shiftedIndex);
+        }
+        else
+        {
 
+          if (enableCFDIntegral)
+          {
+            float maxThr = (hCh.GetMaximum() * integralCFDThreshold);
+            int bin1 = hCh.FindFirstBinAbove(maxThr, 1, cfdSearchStart / SP, cfdSearchEnd / SP);
+            int bin2 = bin1 + (integralCFDWindow / SP);
+            integralStartShifted = bin1 * SP;
+            integralEndShifted = bin2 * SP;
+            float c1 = hCh.GetBinContent(bin1);
+            float c2 = hCh.GetBinContent(bin2);
+            Integral[i] = hCh.Integral(bin1, bin2, "width") - BL_shift * (integralEndShifted - integralStartShifted) - c1 * (integralStartShifted - hCh.GetXaxis()->GetBinLowEdge(bin1)) - c2 * (hCh.GetXaxis()->GetBinUpEdge(bin2) - integralEndShifted);
+          }
+          else
+          {
+            Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(shiftedIndex);
+          }
+        }
 
-        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(shiftedIndex);
         Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(shiftedIndex);
 
         if (allowVetoSkipping && i == vetoChannel)
@@ -832,7 +903,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         {
           if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
           {
+
             cWaves.cd(i + 1);
+            if (zoomedInWaves)
+              hCh.GetXaxis()->SetRange((integralStartShifted - 20) / SP, (integralEndShifted + 30) / SP);
+
             hCh.DrawCopy("HIST"); //No error bars pls
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
             int max_bin = hCh.GetMaximumBin();
@@ -855,9 +930,23 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
             float minY = hCh.GetMinimum();
             float maxY = hCh.GetMaximum();
-
-            TLine *leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
-            TLine *rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+            TLine *leftInterval;
+            TLine *rightInterval;
+            
+            if (enableToT)
+            {
+              int startBin = hCh.FindBin(totIntervalStart);
+              int endBin = hCh.FindBin(totIntervalEnd);
+              float maximum = max_inRange(&hCh, totIntervalStart,totIntervalEnd);
+              float th = (maximum * totThreshold);
+              TLine *threshold = new TLine(startBin*SP, th, endBin*SP, th);
+              threshold->Draw("same");
+           
+            }
+            
+             leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
+             rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+            
 
             leftInterval->SetLineColor(2);
             rightInterval->SetLineColor(2);
@@ -865,9 +954,11 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             baselineUsed->Draw("same");
             ln4->Draw("same");
             ln5->Draw("same");
+           
+            if(!enableToT){
             leftInterval->Draw("same");
             rightInterval->Draw("same");
-
+            }
             TLegend *h_leg = new TLegend(0.77, 0.67, 0.96, 0.77);
             h_leg->AddEntry((TObject *)0, Form("Integral: %f", Integral[i]), "");
             h_leg->AddEntry((TObject *)0, Form("Amplitude: %f", Amplitude[i]), "");
@@ -907,32 +998,31 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           integralEndShifted = integralEnd;
         }
 
-      
-          if (i == 3)
-          {
-            //WOM D
-            IntegralSum[i] = Integral[0] + Integral[1] + Integral[2] + Integral[3] + Integral[4] + Integral[5] + Integral[6] + Integral[7];
-            AmplitudeSum[i] = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
-          }
-          else if (i == 2)
-          {
-            //WOM C
-            IntegralSum[i] = Integral[8] + Integral[9] + Integral[10] + Integral[11] + Integral[12] + Integral[13] + Integral[14] + Integral[15];
-            AmplitudeSum[i] = Amplitude[8] + Amplitude[9] + Amplitude[10] + Amplitude[11] + Amplitude[12] + Amplitude[13] + Amplitude[14] + Amplitude[15];
-          }
-          else if (i == 1)
-          {
-            //WOM B
-            IntegralSum[i] = (8.0 / 7.0) * (Integral[24] + Integral[25] + Integral[26] + Integral[27] + Integral[28] + Integral[29] + Integral[30]);         //1 Missing -> Trigger
-            AmplitudeSum[i] = (8.0 / 7.0) * (Amplitude[24] + Amplitude[25] + Amplitude[26] + Amplitude[27] + Amplitude[28] + Amplitude[29] + Amplitude[30]); //1 Missing -> Trigger
-          }
-          else if (i == 0)
-          {
-            //WOM A
-            IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
-            AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
-          }
-        
+        if (i == 3)
+        {
+          //WOM D
+          IntegralSum[i] = Integral[0] + Integral[1] + Integral[2] + Integral[3] + Integral[4] + Integral[5] + Integral[6] + Integral[7];
+          AmplitudeSum[i] = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
+        }
+        else if (i == 2)
+        {
+          //WOM C
+          IntegralSum[i] = Integral[8] + Integral[9] + Integral[10] + Integral[11] + Integral[12] + Integral[13] + Integral[14] + Integral[15];
+          AmplitudeSum[i] = Amplitude[8] + Amplitude[9] + Amplitude[10] + Amplitude[11] + Amplitude[12] + Amplitude[13] + Amplitude[14] + Amplitude[15];
+        }
+        else if (i == 1)
+        {
+          //WOM B
+          IntegralSum[i] = (8.0 / 7.0) * (Integral[24] + Integral[25] + Integral[26] + Integral[27] + Integral[28] + Integral[29] + Integral[30]);         //1 Missing -> Trigger
+          AmplitudeSum[i] = (8.0 / 7.0) * (Amplitude[24] + Amplitude[25] + Amplitude[26] + Amplitude[27] + Amplitude[28] + Amplitude[29] + Amplitude[30]); //1 Missing -> Trigger
+        }
+        else if (i == 0)
+        {
+          //WOM A
+          IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
+          AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
+        }
+
         float minY = histChannelSumWOM[i]->GetMinimum();
         float maxY = histChannelSumWOM[i]->GetMaximum();
 

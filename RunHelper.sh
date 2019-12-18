@@ -330,7 +330,6 @@ readFast() {
             if [ "$doRun" = "1" ] || [ $readAll = true ]; then #lineArr ist ein Array aus jeder Zeile, getrennt durch Leerzeichen. linearray[0] ist die Run NUMMER
                 rootFileList=""
                 runName=${lineArr[1]}
-
                 runDir=$saveFolder/$runName
                 mkdir "$runDir"
                 rm -rf $runDir/*
@@ -342,12 +341,12 @@ readFast() {
                 threadCounter=0
 
                 #Für jede Bin einzeln durchlaufen
-                while read line; do
+                while read lineTemp; do
 
                     #    ls *.cfg | xargs -P 4 -n 1 read_cfg.sh
                     #   Create RunList for every file
 
-                    echo $line >$runDir/$counter.list
+                    echo $lineTemp >$runDir/$counter.list
                     mkdir $runDir/$counter
                     runDirRelative="${runDir//$here/}"
                     rootTreeFilePath=".$runDirRelative/$counter/out.root/T"
@@ -357,13 +356,12 @@ readFast() {
                 done \
                     <$runDir/$runName.list
 
-                fastRunName=$runNumber
                 fastInFolder=$inFolder
                 fastOutFolder=$outFolder
                 fastHeaderSize=$headerSize
                 fastRunDir=$runDir
-                fastRunName=$runName
-                fastLineArr=$lineArr
+                fastLineArr=($line)
+                fastRunName=${fastLineArr[1]}
                 fastRunNumber=$runNr
 
                 remainder=$((counter % maxThreads))
@@ -374,7 +372,7 @@ readFast() {
                # fi
 
 
-
+                
 
 
                 echo "Loop Number: $loopNumber Number of Files: $counter Extra Threads: $remainder"
@@ -435,7 +433,6 @@ readRoot() {
 }
 
 readFastIteration() {
-
     ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}"
 
 }

@@ -15,11 +15,16 @@ float CFDinvert(TH1F* hWave,float thr);
 float CFDinvertInRange(TH1F* hWave,float thr,float start,float end);
 // INTEGRAL
 float IntegralHist(TH1F* hWave,float t1,float t2,float BL);
+float IntegralHistCFD(TH1F* hWave,float trheshold,float window,float BL);
+
+float IntegralTimeOverThreshold(TH1F* hWave,float startSearch,float endSearch,float threshold,float BL);
+
 // BASELINE
 float* getBL(TH1F* hWave, float* BL, float t1, float t2);
 float* BL_fit(TH1F* hWave, float* BL_chi2, float t1, float t2);
 // AMPLITUDE
 float AmplitudeHist(TH1F* hWave,  float t1, float t2,float BL);
+float AmplitudeHistAlternative(TH1F* hWave, float t1, float t2,float BL);
 float max_inRange(TH1F* hWave,float t1, float t2);
 float t_max_inRange(TH1F* hWave,float t1, float t2);
 float amp_atTime(TH1F* hWave,float t_max);
