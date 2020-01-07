@@ -84,8 +84,8 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 170; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
-float integralEnd = integralStart + 25;
+float integralStart = 150; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
+float integralEnd = integralStart + 100;
 
 int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
 int plotGrid = 3;
@@ -110,15 +110,15 @@ int vetoThreshold = 5; //abs Value -> compares with Amplitude
 
 //Determine Charge by the peak found in the [integralStart, integralEnd] interval with a fixed size of 25ns, if off -> make sure the interval is 25ns or nothing is comparable
 //Do not enable this -> this leads to a bias of the 0.NPE Peak (empty waveforms will have always the maximum)
-bool enablePeakFinder = false;
+bool enablePeakFinder = true;
 
 //timeOverThreshold
-bool enableToT = true;
+bool enableToT = false;
 float totThreshold = 0.3;
 float totIntervalStart = 100;
 float totIntervalEnd = 200;
 
-bool enableCFDIntegral = true;
+bool enableCFDIntegral = false;
 float integralCFDThreshold = 0.3;
 float integralCFDWindow = 25;
 float cfdSearchStart = 100;
@@ -307,6 +307,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   Int_t FirstCellToPlotsamIndex[runChannelNumberWC];
 
   TH1F hCh("hCh", "dummy;ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+  
+ 
   std::vector<TH1F *> hChSum;
   std::vector<TH1F> hChtemp;
   std::vector<TH1F *> hChShift;
@@ -442,6 +444,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
   tree->Branch("EventIDsamIndex", EventIDsamIndex, "EventIDsamIndex[nCh]/I");
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
+
+ // tree->Branch("RawData",amplValues,"amplValues[32][1024]/S");
+
 
   struct rusage r_usage;
 
@@ -817,8 +822,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         */
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
-        float integralStartShifted = t_amp - 10;
-        float integralEndShifted = t_amp + 15;
+        float integralStartShifted = t_amp - 20;
+        float integralEndShifted = t_amp + 70;
 
         if (isDC || !enablePeakFinder)
         {
@@ -1090,6 +1095,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
           }
         }
+    
+    
+
       }
 
       /*Writing the data for that event to the tree.*/
@@ -1101,6 +1109,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       {
         skippedCount = skippedCount + 1;
       }
+
     }
     auto nevent = tree->GetEntries();
 
@@ -1128,12 +1137,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     for (int i = 0; i < runChannelNumberWC; i++)
     {
       cChSum.cd(i + 1);
-      hChSum.at(i)->Draw();
+      hChSum.at(i)->Draw("HIST");
     }
     cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
   }
 
+
+
+  gErrorIgnoreLevel = kWarning;
+  
   rootFile = tree->GetCurrentFile();
   rootFile->Write();
   rootFile->Close();
+  
 }

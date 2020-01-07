@@ -10,3 +10,6 @@ mergeROOTFiles
 RootRunlist.txt
 config.txt
 save/
+redis-stable/
+redis-stable.tar.gz
+dump.rdb
