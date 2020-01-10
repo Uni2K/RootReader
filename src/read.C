@@ -84,7 +84,7 @@ bool switch_BL = false; // true = dyn, false = const
 bool isDC = false;
 //IF the calibration values are correct, otherwise use dummies
 bool isCalibrated = true;
-float integralStart = 150; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
+float integralStart = 100; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
 float integralEnd = integralStart + 100;
 
 int triggerChannel = 8; //starting from 0 -> Calib: 8?, Testbeam '18: 15, Important for timing tSipm,...
@@ -278,6 +278,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   //float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
   //float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
   float Integral[runChannelNumberWC];
+  float IntegralDiff[runChannelNumberWC];
   float IntegralSum[runChannelNumberWC]; //Only Temp
 
   float Amplitude[runChannelNumberWC];
@@ -417,6 +418,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   //tree->Branch("Integral_inRange", Integral_inRange, "Integral_inRange[nCh]/F");
   tree->Branch("Integral", Integral, "Integral[nCh]/F"); // calibrated
                                                          // tree->Branch("Integral_mVns", Integral_mVns, "Integral_mVns[nCh]/F"); // calibrated
+   tree->Branch("IntegralDifference", IntegralDiff, "IntegralDifference[nCh]/F");
+ 
+ 
   // TIMING
   tree->Branch("t", t, "t[nCh]/F");
   tree->Branch("tSiPM", tSiPM, "tSiPM[nCh]/F");
@@ -823,13 +827,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
         float integralStartShifted = t_amp - 20;
-        float integralEndShifted = t_amp + 70;
+        float integralEndShifted = t_amp + 35;
+        float integralEndShiftedAll = t_amp + 135;
 
         if (isDC || !enablePeakFinder)
         {
           //Always the same interval
-          integralStartShifted = integralStart;
-          integralEndShifted = integralEnd;
+      //   integralStartShifted = integralStart;
+        //  integralEndShifted = integralEnd;
         }
 
         int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
@@ -862,6 +867,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         }
 
         Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(shiftedIndex);
+        IntegralDiff[i]=IntegralDifference(&hCh,integralStartShifted,integralEndShifted,integralEndShiftedAll,AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift),BL_shift);
+
 
         if (allowVetoSkipping && i == vetoChannel)
         {
@@ -873,31 +880,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
 
-        //TESTBEAM 2018
-        //Integral_inRange[i] = integral(&hCh, 100, 125, BL_used[i]) / calib_int.at(i); // variable window
-        // calibrated, BL-shifted amplitude at maximum in window
-        //amp[i] = PE(&hCh, calib_amp.at(i), BL_used[i], 100.0, 150.0);
-        //maximum amplitude in range before expected signal (100-130 ns)
-        //amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_used[i], 0.0, 50.0);
-
-        // calibrated, BL-shifted charge
-        /*if (isDC)
-          Integral_inRange[i] = integral(&hCh, 50, 75, BL_shift) / calib_charge.at(i); // for DC runs
-        else
-          Integral_inRange[i] = integral(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(i);
-
-        // calibrated, BL-shifted amplitude at maximum in window
-        if (isDC)
-          amp[i] = PE(&hCh, calib_amp.at(i), BL_shift, 50.0, 100.0); // for DC runs
-        else
-          amp[i] = PE(&hCh, calib_amp.at(i), BL_shift, integralStart, integralEnd);
-        // reduced window
-        if (isDC)
-          amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_shift, 50.0, 75.0); // for DC runs
-        else
-          amp_inRange[i] = PE(&hCh, calib_amp.at(i), BL_shift, integralStart, integralEnd);
-
-      */
 
         if (WOMID[i] >= 0)
           histChannelSumWOM[WOMID[i]]->Add(&hCh);
@@ -911,7 +893,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
             cWaves.cd(i + 1);
             if (zoomedInWaves)
-              hCh.GetXaxis()->SetRange((integralStartShifted - 20) / SP, (integralEndShifted + 30) / SP);
+              hCh.GetXaxis()->SetRange((integralStartShifted - 50) / SP, (integralEndShiftedAll + 50) / SP);
 
             hCh.DrawCopy("HIST"); //No error bars pls
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
@@ -931,13 +913,13 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
             TLine *baselineUsed = new TLine(0, BL_shift, 320, BL_shift);
             baselineUsed->SetLineColor(3);
-            baselineUsed->SetLineWidth(4);
+            baselineUsed->SetLineWidth(2);
 
             float minY = hCh.GetMinimum();
             float maxY = hCh.GetMaximum();
             TLine *leftInterval;
             TLine *rightInterval;
-            
+            TLine *endInterval;
             if (enableToT)
             {
               int startBin = hCh.FindBin(totIntervalStart);
@@ -951,7 +933,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             
              leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
              rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
-            
+             endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
+
 
             leftInterval->SetLineColor(2);
             rightInterval->SetLineColor(2);
@@ -963,10 +946,15 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             if(!enableToT){
             leftInterval->Draw("same");
             rightInterval->Draw("same");
+            endInterval->Draw("same");
+
             }
             TLegend *h_leg = new TLegend(0.77, 0.67, 0.96, 0.77);
             h_leg->AddEntry((TObject *)0, Form("Integral: %f", Integral[i]), "");
             h_leg->AddEntry((TObject *)0, Form("Amplitude: %f", Amplitude[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Window: [%f,%f], Size: %f", integralStartShifted,integralEndShifted,(integralEndShifted-integralStartShifted)), "");
+
+
 
             h_leg->Draw();
 

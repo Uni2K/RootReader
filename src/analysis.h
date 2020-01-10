@@ -16,7 +16,7 @@ float CFDinvertInRange(TH1F* hWave,float thr,float start,float end);
 // INTEGRAL
 float IntegralHist(TH1F* hWave,float t1,float t2,float BL);
 float IntegralHistCFD(TH1F* hWave,float trheshold,float window,float BL);
-
+float IntegralDifference(TH1F* hWave,float leftStart ,float rightEnd,float rightEndAll,float Amplitude,float BL);
 float IntegralTimeOverThreshold(TH1F* hWave,float startSearch,float endSearch,float threshold,float BL);
 
 // BASELINE
@@ -34,5 +34,8 @@ double amp2pe(double y, float calib_factor, float BL_used);
 double correction_function(double x);
 void peakfinder(TH1F *hWave, float t1, float t2, int nPeaks, int sigma, double thr, double *Xarray, double *Yarray, TPolyMarker *pfMarker, bool pfON);
 float estimateNL(TH1F *hWave, float t);
+
+
+
 
 #endif
