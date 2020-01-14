@@ -827,8 +827,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
         float integralStartShifted = t_amp - 20;
-        float integralEndShifted = t_amp + 35;
-        float integralEndShiftedAll = t_amp + 135;
+        float integralEndShifted = t_amp + 33;
+        float integralEndShiftedAll = t_amp + 175.5;
 
         if (isDC || !enablePeakFinder)
         {
