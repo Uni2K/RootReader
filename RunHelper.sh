@@ -30,7 +30,7 @@ showInformation() {
 
     echo "This tool helps you to start your prefered ROOT reading analysis."
 
-    echo "Made by Jan Zimmermann in July/October 2019 (jan4995@gmail.com)"
+    echo "Made with love by Jan Zimmermann in 2019/2020 (jan4995@gmail.com)"
     echo "-------------------------------------------------------"
 
 }
@@ -57,7 +57,7 @@ checkDependencies() {
 
 chooseOutFolder() {
     checkDependencies
-    outFolder=$(zenity --file-selection --directory --title "Select outpu Folder (.bin Files)?")
+    outFolder=$(zenity --file-selection --directory --title "Select output Folder (.bin Files)?")
     #  echo $outFolder
 }
 
@@ -198,7 +198,7 @@ parseRunList() {
 
 compileRead() {
     echo "Compiling Read.C..."
-    g++ ./src/geometry.C ./src/read.C ./src/analysis.C ./src/main.C ./src/calib.C $(root-config --libs --cflags) -lSpectrum -o ./src/read
+    g++ ./src/geometry.C ./src/read.C ./src/analysis.C ./src/main.C ./src/misc.C $(root-config --libs --cflags) -lSpectrum -o ./src/read
     echo "Compiling done!"
 }
 
@@ -211,7 +211,7 @@ readFull() {
     inFolder=$2
     outFolder=$3
     headerSize=$4
-    saveFolder=$outFolder/Full/
+    saveFolder=$outFolder
 
     echo "$runNr"
     echo "$2"
@@ -219,8 +219,8 @@ readFull() {
     echo "$4"
     echo "$saveFolder"
 
-   if [[ " ${runNumber[@]} " =~ "a" ]]; then
-               readAll=true
+    if [[ " ${runNumber[@]} " =~ "a" ]]; then
+        readAll=true
     fi
 
     mkdir "$saveFolder"
@@ -228,16 +228,14 @@ readFull() {
     while read line; do
         [[ $line == \#* ]] && continue
         lineArr=($line)
-       
-       
-            doRun="0"
-            if [[ " ${runNumber[@]} " =~ " ${lineArr[0]} " ]]; then
-               # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]} 
-                doRun="1"
-            fi
 
-             
-            if [ "$doRun" = "1" ] || [ $readAll = true ]; then
+        doRun="0"
+        if [[ " ${runNumber[@]} " =~ " ${lineArr[0]} " ]]; then
+            # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]}
+            doRun="1"
+        fi
+
+        if [ "$doRun" = "1" ] || [ $readAll = true ]; then
             runName=${lineArr[1]}
             runDir=$saveFolder/$runName
             mkdir "$runDir"
@@ -247,7 +245,7 @@ readFull() {
 
             #time $here/readFull $runDir/$runName.list $inFolder/$runName/ $runDir/out.root ${lineArr[0]} ${lineArr[2]} ${lineArr[3]} ${lineArr[4]} ${lineArr[5]} ${lineArr[6]}
 
-            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}"
+            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}" "$automaticWindow"
 
         fi
     done <./RootRunlist.txt
@@ -263,16 +261,16 @@ compileMerger() {
 merger() {
     rootFileList=$1
     ./src/mergeROOTFiles $rootFileList $2 $3
-    
+
     #merge PDF Waves.pdf
-    pdfunite $(find $2 -name "*waves.pdf") $2/waves.pdf 
-    pdfunite $(find $2 -name "*ChSum.pdf") $2/ChSum.pdf 
-    pdfunite $(find $2 -name "*womSum.pdf") $2/womSum.pdf 
+    pdfunite $(find $2 -name "*waves.pdf") $2/waves.pdf
+    pdfunite $(find $2 -name "*ChSum.pdf") $2/ChSum.pdf
+    pdfunite $(find $2 -name "*womSum.pdf") $2/womSum.pdf
 
 }
 
-installPDFUnite(){
-       PKG_OK=$(dpkg-query -W --showformat='${Status}\n' poppler-utils | grep "ok installed")
+installPDFUnite() {
+    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' poppler-utils | grep "ok installed")
     if [ "" == "$PKG_OK" ]; then
         echo Please enter the sudo password to install PDF Unite to create PDF files
 
@@ -288,52 +286,41 @@ readFast() {
     fi
     installPDFUnite
     compileMerger
-    maxThreads=8
     readAll=false
     inFolder=$2
     outFolder=$3
     headerSize=$4
-    saveFolder=$outFolder/Fast/
+    saveFolder=$outFolder
 
     if [[ " ${runNumber[@]} " =~ "a" ]]; then
-               readAll=true
+        readAll=true
     fi
 
     mkdir "$saveFolder"
 
     rootFileList=""
 
-
-
-   
-
-
-
-
-   # " ${runNr[@]} " =~ " ${lineArr[0]} "
-
+    # " ${runNr[@]} " =~ " ${lineArr[0]} "
 
     time (
         while read line; do
-           # echo $line
+            # echo $line
             [[ $line == \#* ]] && continue #Wenn die Zeile leer ist wird "continue" ausgeführt
             lineArr=($line)
-       
 
             doRun="0"
             if [[ " ${runNumber[@]} " =~ " ${lineArr[0]} " ]]; then
-               # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]} 
+                # echo "PRINT 2: " ${runNumber[@]} ${lineArr[0]}
                 doRun="1"
             fi
 
-             
             if [ "$doRun" = "1" ] || [ $readAll = true ]; then #lineArr ist ein Array aus jeder Zeile, getrennt durch Leerzeichen. linearray[0] ist die Run NUMMER
                 rootFileList=""
                 runName=${lineArr[1]}
                 runDir=$saveFolder/$runName
                 mkdir "$runDir"
                 rm -rf $runDir/*
-                 if [ ! -e $runDir/$runName.list ]; then
+                if [ ! -e $runDir/$runName.list ]; then
                     ls $inFolder/$runName | grep \.bin >$runDir/$runName.list #Durchsucht das RunName verzeichnis nach bins files und erstellt eine Runlist
                 fi
 
@@ -364,22 +351,18 @@ readFast() {
                 fastRunName=${fastLineArr[1]}
                 fastRunNumber=$runNr
 
-                remainder=$((counter % maxThreads))
-                loopNumber=$((counter / maxThreads))
+                remainder=$((counter % threads))
+                loopNumber=$((counter / threads))
                 #loopNumber=$((loopNumber - 1)) #to have to correct number in the loop
-               # if [ "$remainder" != "0" ]; then
-                 #   loopNumber=$((loopNumber + 1))
-               # fi
+                # if [ "$remainder" != "0" ]; then
+                #   loopNumber=$((loopNumber + 1))
+                # fi
 
-
-                
-
-
-                echo "Loop Number: $loopNumber Number of Files: $counter Extra Threads: $remainder"
+                echo "Loop Number: $loopNumber Number of Files: $counter Extra Threads: $remainder Threads: $threads"
                 for currentBin in $(seq 1 $loopNumber); do
-                  echo "Main Thread Loop Started"
+                    echo "Main Thread Loop Started"
 
-                    for ((i = 0; i < "$maxThreads"; i++)); do
+                    for ((i = 0; i < "$threads"; i++)); do
                         readFastIteration $threadCounter &
                         threadCounter=$((threadCounter + 1))
                     done
@@ -388,20 +371,18 @@ readFast() {
 
                 done
                 for currentBinRemain in $(seq 1 $remainder); do
-                echo "Remainder Thread Started"
-                        readFastIteration $threadCounter &
-                        threadCounter=$((threadCounter + 1))
+                    echo "Remainder Thread Started"
+                    readFastIteration $threadCounter &
+                    threadCounter=$((threadCounter + 1))
 
                 done
-
-
 
                 wait
 
                 merger $rootFileList $runDir $runName
                 #rm $runDir/*.list
-             rm -rf $runDir/*/
-            find $runDir -name "*.list" -type f -delete
+                rm -rf $runDir/*/
+                find $runDir -name "*.list" -type f -delete
 
             fi
 
@@ -416,42 +397,63 @@ readFast() {
 
 readRoot() {
 
-    readMode=$1  #0= FULL #1=FAST
+    threads=$1
     runNumber=$2 #a=ALL
     inFolder=$3
     outFolder=$4
     headerSize=$5
-    case $readMode in
-    0)
-        readFull $runNumber $inFolder $outFolder $headerSize
-        ;;
-    1)
+    if [ "$threads" -gt "1" ]; then
         readFast $runNumber $inFolder $outFolder $headerSize
-        ;;
-    esac
+    else
+        readFull $runNumber $inFolder $outFolder $headerSize
+    fi
 
 }
 
 readFastIteration() {
-    ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}"
+    ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}" "$automaticWindow"
 
 }
-
 
 saveConfig() {
     rm config.txt 2>/dev/null
     destdir=config.txt
     echo "$inFolder" >>"$destdir"
     echo "$outFolder" >>"$destdir"
-    echo "$readMode" >>"$destdir"
+    echo "$threads" >>"$destdir"
     echo "$runNumber" >>"$destdir"
     echo "$headerSize" >>"$destdir"
     echo "$isDC" >>"$destdir"
     echo "$dynamicBL" >>"$destdir"
     echo "$useCalibValues" >>"$destdir"
     echo "$useExistingRunList" >>"$destdir"
-
+    echo "$automaticConfig" >>"$destdir"
     echo "config saved!"
+
+}
+
+saveAnalysisPath() {
+    rm analysisPath.txt 2>/dev/null
+    destdir=analysisPath.txt
+    echo "$analysisPath" >>"$destdir"
+}
+loadAnalysisPath() {
+    if test -f "analysisPath.txt"; then
+        if ! test -z "$(awk 'NR == 1' analysisPath.txt)"; then
+            analysisPath=$(awk 'NR == 1' analysisPath.txt)
+        fi
+
+    fi
+}
+
+checkAutomaticConfig() {
+    if test -f "config.txt"; then
+        tempConfig=$(awk 'NR == 10' config.txt)
+    fi
+    if [ "$tempConfig" = true ]; then
+        loadConfig
+
+    fi
 
 }
 
@@ -462,28 +464,159 @@ loadConfig() {
     if test -f "config.txt"; then
         inFolder=$(awk 'NR == 1' config.txt)
         outFolder=$(awk 'NR == 2' config.txt)
-        readMode=$(awk 'NR == 3' config.txt)
+        threads=$(awk 'NR == 3' config.txt)
         runNumber=$(awk 'NR == 4' config.txt)
         headerSize=$(awk 'NR == 5' config.txt)
         isDC=$(awk 'NR == 6' config.txt)
         dynamicBL=$(awk 'NR == 7' config.txt)
         useCalibValues=$(awk 'NR == 8' config.txt)
         useExistingRunList=$(awk 'NR == 9' config.txt)
-
-        if [ "$readMode" = "1" ]; then
-                runMode="Fast"
-            else
-                runMode="Full"
-           
-            fi
-
-
-
+        automaticConfig=$(awk 'NR == 10' config.txt)
         echo "config loaded!"
     else
         echo "config file not found! Save a config first!"
 
     fi
+}
+
+startAutomaticBaseline() {
+    while true; do
+        select yn in "Yes" "No"; do
+            case $yn in
+
+            \
+                "No")
+                break 2
+                ;;
+
+            "Yes")
+                echo "Started for runs: (${runNumber[*]}) "
+
+                baselineScriptDir=$(find $analysisPath -name 'BaselineAverage.sh' -printf "%h\n")
+                rootfileFolderDir=$analysisPath/rootfiles
+
+                echo "Location of the Baseline Script $baselineScriptDir"
+                echo "Location of the Rootfile Folder  $rootfileFolderDir"
+
+                echo "Starting Runs with dynamic Baseline..."
+                dynamicBL="1"
+                start
+
+                echo "Moving files..."
+
+                for n in ${runNumber[@]}; do
+                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                done
+
+                echo "Starting Baseline Script"
+                ($baselineScriptDir/BaselineAverage.sh)
+                echo "Done Baseline Script! "
+                echo "Moving Baselines.txt to RunHelper/src"
+                cwd=$(pwd)
+                find $baselineScriptDir -type f -name "Baselines.txt" -exec cp {} $cwd/src/ \;
+
+                echo "Starting Runs with constant Baseline..."
+                dynamicBL="0"
+                start
+
+                echo "Moving files..."
+
+                for n in ${runNumber[@]}; do
+                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                done
+                 echo "Automatic Baseline done!"
+
+                break 2
+                ;;
+            esac
+        done
+    done
+
+}
+
+startAutomaticIntegration() {
+    
+        echo "Start? (Run:  ${runNumber[*]})"
+        select yn in "Yes" "No"; do
+            case $yn in
+
+            \
+                "No")
+                break 2
+                ;;
+
+            "Yes")
+                echo "Started for runs: (${runNumber[*]}) "
+
+                iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
+                rootfileFolderDir=$analysisPath/rootfiles
+
+                echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
+                echo "Yes -> starts automatic Baseline File creation"
+                select yn in "Create" "Copy" "Continue"; do
+                    case $yn in
+                    "Create")
+                        echo "Start creating Rootfiles with a constant Baseline? (Run: $runNumber)"
+                        startAutomaticBaseline
+                        break 
+                        ;;
+                    "Continue")
+                        break 
+                        ;;
+                    "Copy")
+                        for n in ${runNumber[@]}; do
+                            find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                        done
+                        break 
+                        ;;
+                    esac
+                done
+
+                echo "Location of the Integration Scripts $iwScriptDir"
+                echo "Location of the Rootfile Folder  $rootfileFolderDir"
+
+                echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
+                ($iwScriptDir/IntegrationWindowAnalysis.sh)
+                echo "Done Integration Window Script! "
+                echo "Moving IntegrationWindows.txt to RunHelper/src"
+                cwd=$(pwd)
+                find $iwScriptDir -type f -name "IntegrationWindows.txt" -exec cp {} $cwd/src/ \;
+
+                automaticWindow=true #make sure this is on
+                echo "Run with new Integration Windows... "
+                start
+                echo "Moving files..."
+                for n in ${runNumber[@]}; do
+                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                done
+
+                 echo "Calculating the Correction Factor..."
+                ($iwScriptDir/IntegrationWindowAnalysis.sh)
+                echo "Done Integration Window Script! "
+                echo "Moving CorrectionValues.txt to RunHelper/src"
+                cwd=$(pwd)
+                find $iwScriptDir -type f -name "CorrectionValues.txt" -exec cp {} $cwd/src/ \;
+                
+                echo "Run with Correction Factor... "
+                start
+                echo "Moving files..."
+                for n in ${runNumber[@]}; do
+                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                done   
+
+                 echo "Automatic Integration Done"
+
+
+
+
+
+
+                break
+                ;;
+            esac
+        done
+   
+
 }
 
 start() {
@@ -500,11 +633,16 @@ start() {
     echo "Input data folder: $inFolder"
     echo "Output data folder: $outFolder"
     echo "Compiles the scripts: $shouldCompile"
-    echo "RunMode: $runMode ($readMode)"
+    echo "Threads: $threads"
     echo "RunNumber: $runNumber"
     echo "Use Existing RunList: $useExistingRunList"
     echo "Header Size: $headerSize"
+    echo "Automatic Config: $automaticConfig"
     echo "---------------------------------------------"
+
+    if [ "$automaticConfig" = true ]; then
+        saveConfig
+    fi
 
     createInAndOutFolder $inFolder $outFolder
 
@@ -523,7 +661,7 @@ start() {
         fi
     fi
 
-    readRoot $readMode $runNumber $inFolder $outFolder $headerSize
+    readRoot $threads $runNumber $inFolder $outFolder $headerSize
     echo "---------------------------------------------"
     echo "  ____    ___   _   _  _____ "
     echo " |  _ \  / _ \ | \ | || ____|"
@@ -548,16 +686,18 @@ src=$here/src/
 inFolder=$here/data
 outFolder=$here/runs
 shouldCompile=true
-runMode="Fast"
+automaticConfig=false
+threads=6
 runNumber=a
-readMode=1
 headerSize=a
 useExistingRunList=false
+automaticWindow=true
 useCalibValues="0"
 dynamicBL="1"
 isDC="0"
 nameSchema="2019"
-
+checkAutomaticConfig
+loadAnalysisPath
 echo "-------------------------------------------------------"
 
 echo "Select an option!"
@@ -567,39 +707,94 @@ while true; do
     echo "-------------------------------------------------------"
     echo "-------------------------------------------------------"
 
-    select yn in "Start" "RunMode ($runMode)" "RunNumber (${runNumber[*]})" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Load Config" "Save Config" "Informations"; do
+    # select yn in "Start" "RunMode ($threads)" "RunNumber (${runNumber[*]})" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Load Config" "Save Config" "Informations"; do
+    select yn in "Start" "RunNumber (${runNumber[*]})" "Settings" "Tools" "Load Config" "Save Config" "Informations"; do
         case $yn in
 
-        "RunList Naming Schema ($nameSchema)")
-            echo "Enter Name Schema ($nameSchema)"
-            read nameSchema
-            break
-            ;;
-
         \
-            "Start")
-            printf "\033c" #Clean Screen
-            start
-            break 2
-            ;;
-
-        \
-            "Calibration/Baseline")
+            \
+            "Settings")
             while true; do
-                select yn in "Is Dark Count Measurement ($isDC)" "Dynamic Baseline ($dynamicBL)" "Use Constant Calibration Values ($useCalibValues)" "<- Back"; do
+                select yn in "Threads ($threads)" "Automatic Integration Window ($automaticWindow)" "Automatic Config Saving ($automaticConfig)" "Compile Readscripts ($shouldCompile)" "Binary Headersize ($headerSize)" "Calibration/Baseline" "Use existing RunList ($useExistingRunList)" "RunList Naming Schema ($nameSchema)" "Change Input Folder ($inFolder)" "Change Output Folder ($outFolder)" "<- Back"; do
                     case $yn in
 
                     \
                         "<- Back")
                         break 2
                         ;;
+                    "Threads ($threads)")
+                        echo "How many threads should run parallel? (1 Thread -> Slow, but no ROOT File merging), 8 CORE CPU -> Max 8 Threads, 1 Thread takes about 1GB RAM"
+                        read threads
+                        break
+                        ;;
+                    "Automatic Integration Window ($automaticWindow)")
+                        echo "Uses the values stored in the IntegrationWindow.txt File, generated by the analysis tool 'IntegrationWindowAnalysis' , if false -> hardcoded values in read.C"
+                        if [ "$automaticWindow" = false ]; then
+                            automaticWindow=true
+                        else
+                            automaticWindow=false
+                        fi
+                        break
+                        ;;
 
+                    "Automatic Config Saving ($automaticConfig)")
+                        echo "Saves and restores the latest started run config! (Changing this automatically saves the config)"
+                        if [ "$automaticConfig" = false ]; then
+                            automaticConfig=true
+                        else
+                            automaticConfig=false
+                        fi
+                        saveConfig
+                        break
+                        ;;
+
+                    \
+                        "Change Input Folder ($inFolder)")
+                        chooseInFolder
+                        break
+                        ;;
+                    "Binary Headersize ($headerSize)")
+                        echo "Enter the headersize of the binary files (Depends on the WC version)"
+                        echo "Version: <2.8.14: 327,  ==2.8.14: 328,  >2.8.14: 403   -> a=automatic"
+
+                        read headerSize
+                        break
+                        ;;
+
+                    "Change Output Folder ($outFolder)")
+                        chooseOutFolder
+                        break
+                        ;;
+                    "Compile Readscripts ($shouldCompile)")
+                        if [ "$shouldCompile" = false ]; then
+                            shouldCompile=true
+                        else
+                            shouldCompile=false
+                        fi
+
+                        break
+                        ;;
                     "Is Dark Count Measurement ($isDC)")
                         if [ "$isDC" = "0" ]; then
                             isDC="1"
                         else
                             isDC="0"
                         fi
+                        break
+                        ;;
+                    "Use existing RunList ($useExistingRunList)")
+                        if [ "$useExistingRunList" = false ]; then
+                            useExistingRunList=true
+
+                        else
+                            useExistingRunList=false
+                        fi
+                        break
+                        ;;
+
+                    "RunList Naming Schema ($nameSchema)")
+                        echo "Enter Name Schema ($nameSchema)"
+                        read nameSchema
                         break
                         ;;
                     "Dynamic Baseline ($dynamicBL)")
@@ -618,100 +813,181 @@ while true; do
                         fi
                         break
                         ;;
+
+                    "Calibration/Baseline")
+                        while true; do
+                            select yn in "Is Dark Count Measurement ($isDC)" "Dynamic Baseline ($dynamicBL)" "Use Constant Calibration Values ($useCalibValues)" "<- Back"; do
+                                case $yn in
+
+                                \
+                                    "<- Back")
+                                    break 2
+                                    ;;
+
+                                "Is Dark Count Measurement ($isDC)")
+                                    if [ "$isDC" = "0" ]; then
+                                        isDC="1"
+                                    else
+                                        isDC="0"
+                                    fi
+                                    break
+                                    ;;
+                                "Dynamic Baseline ($dynamicBL)")
+                                    if [ "$dynamicBL" = "0" ]; then
+                                        dynamicBL="1"
+                                    else
+                                        dynamicBL="0"
+                                    fi
+                                    break
+                                    ;;
+                                "Use Constant Calibration Values ($useCalibValues)")
+                                    if [ "$useCalibValues" = "0" ]; then
+                                        useCalibValues="1"
+                                    else
+                                        useCalibValues="0"
+                                    fi
+                                    break
+                                    ;;
+                                esac
+                            done
+                        done
+
+                        break
+                        ;;
                     esac
                 done
             done
-
             break
+            ;;
+
+        \
+            "Start")
+            printf "\033c" #Clean Screen
+            start
+
+            break 2
             ;;
 
         \
             "RunNumber ($runNumber)")
             echo "Enter a runNumber (ALL=a, Example: 22 OR multiple: 31,32,40 OR range: 10-15 OR combined)"
             read runNumberRaw
-             runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
-    	    # echo "${runNumber[*]}"
+            runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
+            # echo "${runNumber[*]}"
 
-            for i in "${runNumberRaw[@]}"
-                do
-            : 
-        if [[ $i == *"-"* ]]; then
-             range=($(echo $i | tr "-" "\n"))
-             startValue=${range[0]}
-             endValue=${range[1]}
-            
-            while [ $startValue -le $endValue ]
-            do
-            runNumberRaw=("$startValue" "${runNumberRaw[@]}")
-            startValue=$[$startValue+1]
+            for i in "${runNumberRaw[@]}"; do
+                :
+                if [[ $i == *"-"* ]]; then
+                    range=($(echo $i | tr "-" "\n"))
+                    startValue=${range[0]}
+                    endValue=${range[1]}
+
+                    while [ $startValue -le $endValue ]; do
+                        runNumberRaw=("$startValue" "${runNumberRaw[@]}")
+                        startValue=$(($startValue + 1))
+                    done
+                fi
+
+                #Remove Range
+                unset runNumber
+                for z in "${runNumberRaw[@]}"; do
+                    :
+                    if [[ $z != *"-"* ]]; then
+                        runNumber=("$z" "${runNumber[@]}")
+                    fi
+                done
             done
-        fi
-
-
-        #Remove Range
-        unset runNumber
-        for z in "${runNumberRaw[@]}"
-                do
-        : 
-        if [[ $z != *"-"* ]]; then
-            runNumber=("$z" "${runNumber[@]}")
-        fi
-        done
-
-
-
-
-        done
             break
             ;;
 
-        "Change Input Folder ($inFolder)")
-            chooseInFolder
-            break
-            ;;
-        "Change Output Folder ($outFolder)")
-            chooseOutFolder
-            break
-            ;;
-        "Compile Readscripts ($shouldCompile)")
-            if [ "$shouldCompile" = false ]; then
-                shouldCompile=true
-            else
-                shouldCompile=false
-            fi
+        "Tools")
+            while true; do
+                select yn in "Automatic Baseline Run" "Automatic Integration Run" "<- Back"; do
+                    case $yn in
+
+                    \
+                        "<- Back")
+                        break 2
+                        ;;
+
+                    "Automatic Baseline Run")
+                        echo "This will start an automatic run, creating a root file with a constant baseline inside the run folder"
+                        if [ -z ${analysisPath+x} ]; then
+                            echo "Your analysis script path is not set. Do it now:"
+                            analysisPath=$(zenity --file-selection --directory --title "Select Analysis Script path")
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                saveAnalysisPath
+                            fi
+
+                            echo "Your analysis script path is: $analysisPath"
+                            echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+                            echo "Start? (Run: ${runNumber[*]})"
+                            startAutomaticBaseline
+
+                        else
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                echo "Your analysis script path is: $analysisPath"
+                                echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+                                echo "Start? (Run: ${runNumber[*]})"
+                                startAutomaticBaseline
+                            fi
+
+                        fi
+
+                        # echo "Your analysis script path is set to: $analysisPath"
+
+                        #outFolder=$(zenity --file-selection --directory --title "Select output Folder (.bin Files)?")
+
+                        break 2
+                        ;;
+                    "Automatic Integration Run")
+                        echo "This will start an automatic run, creating a root file with correct integrals"
+                        if [ -z ${analysisPath+x} ]; then
+                            echo "Your analysis script path is not set. Do it now:"
+                            analysisPath=$(zenity --file-selection --directory --title "Select Analysis Script path")
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                saveAnalysisPath
+                            fi
+
+                            echo "Your analysis script path is: $analysisPath"
+                            echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                            startAutomaticIntegration
+
+                        else
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                echo "Your analysis script path is: $analysisPath"
+                                echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                                startAutomaticIntegration
+                            fi
+
+                        fi
+
+                        # echo "Your analysis script path is set to: $analysisPath"
+
+                        #outFolder=$(zenity --file-selection --directory --title "Select output Folder (.bin Files)?")
+
+                        break 2
+                        ;;
+
+                    esac
+
+                done
+            done
 
             break
             ;;
-        "RunMode ($runMode)")
-            if [ "$runMode" = "Full" ]; then
-                runMode="Fast"
-                readMode=1
-            else
-                runMode="Full"
-                readMode=0
-            fi
-            break
-            ;;
 
-        "Use existing RunList ($useExistingRunList)")
-            if [ "$useExistingRunList" = false ]; then
-                useExistingRunList=true
-
-            else
-                useExistingRunList=false
-            fi
-            break
-            ;;
-        "Binary Headersize ($headerSize)")
-            echo "Enter the headersize of the binary files (Depends on the WC version)"
-            echo "Version: <2.8.14: 327,  ==2.8.14: 328,  >2.8.14: 403   -> a=automatic"
-
-            read headerSize
-            break
-            ;;
-
-        \
-            "Load Config")
+        "Load Config")
             loadConfig
             break
             ;;
@@ -721,10 +997,9 @@ while true; do
             ;;
         "Informations")
             echo "-------------------------------------------------------"
-
-            echo "RunMode Informations: "
-            echo "Full: High memory usage but all histogramms (1 Root file, fast at small datasets)"
-            echo "Fast: Low memory usage but broken histogramms (Multiple merged Root file, slow at small datasets)"
+            echo "Thread Informations: "
+            echo "1 Thread:  High memory usage, very slow. But there is no merging of individual rootfiles, which could probably be an error source."
+            echo "More than 1 Thread: Creats multiple Rootfiles at the same time and merges them together with TChain, Histograms are missing if not included in MergeRootFiles.C"
             echo "RunList: Has to be in the same directory as this script, named: RootRunlist, Content like: 22 22_muon6_pos4 4 -13 6 0 AB per Line"
             echo "-------------------------------------------------------"
             echo "Header: The header size (open binary file with editor and count chars at the top)"
@@ -733,6 +1008,7 @@ while true; do
             echo "Changes like reading new data in the event structure or reading a dummy byte!"
             echo "Just put headersize on 'a' to let the system detect the headersize by reading the printable chars at the .bin beginning"
             echo "Maybe helping: https://owncloud.lal.in2p3.fr/index.php/s/3c1804f473fc1b2d3de454a23329b4a7"
+            echo "If there are still questions, feel free to contact me: jan4995@gmail.com"
             echo "-------------------------------------------------------"
 
             break

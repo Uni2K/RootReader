@@ -21,7 +21,6 @@
 #include <TError.h>      // root verbosity level
 #include <TSystem.h>     // root verbosity level
 
-//#include <TStyle.h>
 #include <sys/resource.h>
 //C, C++
 #include <stdio.h>
@@ -32,17 +31,28 @@
 #include <stdlib.h>
 #include <sstream>
 #include <numeric>
+#include <tuple>
+#include <map>
 //specific
 #include "geometry.h"
 #include "analysis.h"
-#include "calib.h"
+#include "misc.h"
 #include "read.h"
 
 float SP = 0.3125;                                                                                                             // ns per bin
 float pe = 47.46;                                                                                                              //mV*ns
-vector<float> calib_amp = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};    // dummy
-vector<float> calib_charge = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
+
+vector<float> calibrationCharges = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}; // dummy
+vector<float> calibrationChargeErrors = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // dummy
+string calibrationRunName="7_calib_vb58_tune8700_pcbd";
+string dcIntegrationWindow="7_calib_vb58_tune8700_pcbd";
+
 vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy
+vector<float> integrationWindowsEntireSignal = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy , left is always -20 measured to the max
+vector<float> integrationWindowsPeakSignal = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy , left is always -20 measured to the max
+vector<float> correctionValues = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};;     // dummy , left is always -20 measured to the max
+vector<float> correctionValueErrors = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};     // dummy , left is always -20 measured to the max
+
 
 double coef = 2.5 / (4096 * 10);
 
@@ -70,20 +80,21 @@ Float_t tSUMp = -999;
 Float_t tSUMm = -999;
 Int_t nCh = -1;
 int womCount = 4;
-
 int nActiveCh = -1;
 int numberOfBinaryFiles = 0;
+string workingDir;
+char cwd[PATH_MAX];
 #define btoa(x) ((x) ? "true" : "false")
+
+//SETTINGS------------------------------------------------------------------------------------------
 int defaultErrorLevel = kError;
 bool print = true;
 int headerSize = 328;
 bool newerVersion = false;
-// SWITCH dynamic <-> constant baseline
-bool switch_BL = false; // true = dyn, false = const
-//Integration Window
+bool switch_BL = false; // SWITCH dynamic <-> constant baseline // true = dyn, false = const
 bool isDC = false;
-//IF the calibration values are correct, otherwise use dummies
-bool isCalibrated = true;
+bool automaticWindow = true;
+bool useConstCalibValues = false;//IF the calibration values are correct, otherwise use dummies
 float integralStart = 100; //Testbeam: 100, 125 charge, Calib Nobember 2019: 165+25ns, Calib LED: 150  -> Very important: Integrationsstart and Time Window -> Determines the gain, slight changes result in big gain differences
 float integralEnd = integralStart + 100;
 
@@ -102,158 +113,143 @@ int skipInChannel = 0;
 //Skip events that exceed the WC maximum, does not include TriggerChannel
 bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 650;
-
 //Skip veto events -> if channel sees something-> Skip
 bool allowVetoSkipping = false;
 int vetoChannel = 9;
 int vetoThreshold = 5; //abs Value -> compares with Amplitude
 
-//Determine Charge by the peak found in the [integralStart, integralEnd] interval with a fixed size of 25ns, if off -> make sure the interval is 25ns or nothing is comparable
-//Do not enable this -> this leads to a bias of the 0.NPE Peak (empty waveforms will have always the maximum)
-bool enablePeakFinder = true;
-
-//timeOverThreshold
-bool enableToT = false;
-float totThreshold = 0.3;
-float totIntervalStart = 100;
-float totIntervalEnd = 200;
-
-bool enableCFDIntegral = false;
-float integralCFDThreshold = 0.3;
-float integralCFDWindow = 25;
-float cfdSearchStart = 100;
-float cfdSearchEnd = 200;
-
-bool zoomedInWaves = true;
+bool zoomedInWaves = false; //Zoom in the waves.pdf on the signal range
 
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
 bool forcePrintEvent = false;
-int maximalForcePrintEvents = 5;
+int maximalForcePrintEvents = 20;
 int forcePrintEvents = 0;
 
-void read(TString _inFileList, TString _inDataFolder, TString _outFile, string runName, string _headerSize, string isDC_, string dynamicBL_, string useConstCalibValues_, string runParameter)
+struct rusage r_usage;
+
+
+/***
+ *      ____  _____    _    ____    ____   ____ ____  ___ ____ _____ 
+ *     |  _ \| ____|  / \  |  _ \  / ___| / ___|  _ \|_ _|  _ \_   _|
+ *     | |_) |  _|   / _ \ | | | | \___ \| |   | |_) || || |_) || |  
+ *     |  _ <| |___ / ___ \| |_| |  ___) | |___|  _ < | ||  __/ | |  
+ *     |_| \_\_____/_/   \_\____/  |____/ \____|_| \_\___|_|    |_|  
+ *                                                                   
+ */
+
+
+void read(map<string, string> readParameters)
 {
 
+
+  /***
+ *     __        __              ___ ___  ___  __   __  
+ *    |__)  /\  |__)  /\   |\/| |__   |  |__  |__) /__` 
+ *    |    /~~\ |  \ /~~\  |  | |___  |  |___ |  \ .__/ 
+ *                                                      
+ */
+
   gErrorIgnoreLevel = defaultErrorLevel;
-  std::vector<std::string> runParams;
-  std::string token;
-  std::istringstream tokenStream(runParameter);
+  string runName =readParameters["runName"];
+  TString inFileList=readParameters["inFileList"];
+  TString inDataFolder=readParameters["inDataFolder"];
+  TString outFile=readParameters["outFile"];
+  int headerSize=stoi(readParameters["headerSize"]);
 
-  char split_char = ',';
-  while (std::getline(tokenStream, token, split_char))
-  {
-    runParams.push_back(token);
-  }
-
-  // Run Parameter
   try
   {
-    runNumber = stoi(runParams[0]);
+    runNumber = stoi(readParameters["runNumber"]);
+    runPosition = stoi(readParameters["runPosition"]);
+    runAngle = stoi(readParameters["runAngle"]);
+    runEnergy = stoi(readParameters["runEnergy"]);
+    runChannelNumberWC = stoi(readParameters["runChannelNumberWC"]);
   }
   catch (const std::exception &e)
   {
     //  std::cerr <<"Error at runNumber:" <<e.what() << '\n';
   }
 
-  try
-  {
-    runPosition = stoi(runParams[1]);
-  }
-  catch (const std::exception &e)
-  {
-    // std::cerr <<"Error at runPosition:" <<e.what() << '\n';
-  }
 
-  try
-  {
-    runAngle = stoi(runParams[2]);
-  }
-  catch (const std::exception &e)
-  {
-    // std::cerr <<"Error at runAngle:" <<e.what() << '\n';
-  }
+switch_BL = parseBoolean(readParameters["dynamicBL"]);
+isDC = parseBoolean(readParameters["isDC"]);
+useConstCalibValues = parseBoolean(readParameters["useConstCalibValues"]);
+automaticWindow = parseBoolean(readParameters["automaticWindow"]);
 
-  try
-  {
-    runEnergy = stoi(runParams[3]);
-  }
-  catch (const std::exception &e)
-  {
-    //  std::cerr <<"Error at runEnergy:" <<e.what() << '\n';
-  }
+plotGrid = ceil(sqrt(runChannelNumberWC));
 
-  try
-  {
-    if (runParams.size() > 4)
-      runChannelNumberWC = stoi(runParams[4]);
-  }
-  catch (const std::exception &e)
-  {
-
-    // std::cerr <<"Error at runChannelNr:" <<e.what() << '\n';
-  }
-
-  plotGrid = ceil(sqrt(runChannelNumberWC));
-
-  if (dynamicBL_ == "0")
-  {
-    switch_BL = false;
-  }
-  else
-  {
-    switch_BL = true;
-  }
-  if (isDC_ == "0")
-  {
-    isDC = false;
-  }
-  else
-  {
-    isDC = true;
-  }
-  if (useConstCalibValues_ == "0")
-  {
-    isCalibrated = false;
-  }
-  else
-  {
-    isCalibrated = true;
-  }
-
-  string workingDir;
-  char cwd[PATH_MAX];
+  
   if (getcwd(cwd, sizeof(cwd)) != NULL)
   {
-    //printf("Current working dir: %s\n", cwd);
     workingDir = cwd;
   }
   else
   {
     perror("getcwd() error");
+    assert(0);
   }
-  string amp_file = "/src/calibration_amp.txt";
-  string charge_file = "/src/calibration_charge.txt";
+
+
+  string charge_file = "/src/CalibrationValues.txt";
   string baseline_file = "/src/Baselines.txt";
-  string calib_path_amp = workingDir + amp_file;
+  string integrationWindowPath = "/src/IntegrationWindows.txt";
+  string correctionFactorPath = "/src/CorrectionValues.txt";
+
   string calib_path_charge = workingDir + charge_file;
   string calib_path_bl = workingDir + baseline_file;
+  string integrationWindowFile = workingDir + integrationWindowPath;
+  string correctionValueFile = workingDir + correctionFactorPath;
 
-  if (isCalibrated)
-    calib_amp = readCalib(calib_path_amp, runName, 1);
-  if (isCalibrated)
-    calib_charge = readCalib(calib_path_charge, runName, 1);
+
+  if (useConstCalibValues){
+    pair<vector<float>, vector<float>> pairIW=  readPair(calib_path_charge, calibrationRunName, 1,0);
+    calibrationCharges=pairIW.first;
+    calibrationChargeErrors=pairIW.second;
+  }
+  string iwSelection=runName;
+    if (runName.find("dc") != std::string::npos) {
+     isDC=true;
+     if(automaticWindow){
+       iwSelection=dcIntegrationWindow;
+     }
+
+      }
+
+
+
   if (!switch_BL)
-    BL_const = readCalib(calib_path_bl, runName, 0);
+    BL_const = readVector(calib_path_bl, runName, 0);
+  if(automaticWindow){
+    pair<vector<float>, vector<float>> pairIW= readPair(integrationWindowFile, iwSelection, 0,0);
+    integrationWindowsPeakSignal=pairIW.first;
+    integrationWindowsEntireSignal=pairIW.second;
+
+    pair<vector<float>, vector<float>> pairCF=  readPair(correctionValueFile,  iwSelection, 1,0);
+    correctionValues=pairCF.first;
+    correctionValueErrors=pairCF.second;
+
+  }
+
+  
+
+  
+
+
+/***
+ *    ___  __   ___  ___     __   ___ ___       __  
+ *     |  |__) |__  |__     /__` |__   |  |  | |__) 
+ *     |  |  \ |___ |___    .__/ |___  |  \__/ |    
+ *                                                  
+ */
 
   /*Create root-file and root-tree for data*/
-  TFile *rootFile = new TFile(_outFile, "RECREATE");
+  TFile *rootFile = new TFile(outFile, "RECREATE");
   if (rootFile->IsZombie())
   {
     if (numberOfBinaryFiles > 1)
     {
       cout << "PROBLEM with the initialization of the output ROOT ntuple "
-           << _outFile << ": check that the path is correct!!!"
+           << outFile << ": check that the path is correct!!!"
            << endl;
     }
     exit(-1);
@@ -264,26 +260,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
 
   Int_t ChannelNr[runChannelNumberWC];
   int WOMID[runChannelNumberWC]; //1=A, 2=B, 3=C, 4=D
-
   float chPE[runChannelNumberWC];     // single channel amplitude at sum signal
   float chPE_int[runChannelNumberWC]; // single channel integral
-
-  // std::vector<float> amp(runChannelNumberWC, -999);
-  //std::vector<float> amp_inRange(runChannelNumberWC, -999);
   std::vector<float> max(runChannelNumberWC, -999);
   std::vector<float> min(runChannelNumberWC, -999);
   Float_t t[runChannelNumberWC];
   Float_t tSiPM[(runChannelNumberWC - 1)]; //Minus Trigger
-
-  //float Integral_0_300[runChannelNumberWC];   //array used to store Integral of signal from 0 to 300ns
-  //float Integral_inRange[runChannelNumberWC]; // calculate integral in given range
   float Integral[runChannelNumberWC];
   float IntegralDiff[runChannelNumberWC];
   float IntegralSum[runChannelNumberWC]; //Only Temp
-
   float Amplitude[runChannelNumberWC];
   float AmplitudeSum[runChannelNumberWC];
-
   float BL_output[4];                        //array used for output getBL-function
   Float_t BL_lower[runChannelNumberWC];      //store baseline for runChannelNumberWC channels for 0-75ns range
   Float_t BL_RMS_lower[runChannelNumberWC];  //store rms of baseline for runChannelNumberWC channels for 0-75ns range
@@ -293,23 +280,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   Float_t BL_RMS_upper[runChannelNumberWC];  //store rms of baseline for runChannelNumberWC channels for 220-320ns range
   Float_t BL_Chi2_upper[runChannelNumberWC]; //store chi2/dof of baseline-fit for runChannelNumberWC channels for 220-320ns range
   Float_t BL_pValue_upper[runChannelNumberWC];
-
   Float_t BL_used[runChannelNumberWC];
   Float_t BL_Chi2_used[runChannelNumberWC];
   Float_t BL_pValue_used[runChannelNumberWC];
   float noiseLevel[runChannelNumberWC];
-
-  int nPeaks = 4; // maximum number of peaks to be stored by peakfinder; has to be set also when creating branch
-  Double_t peakX[runChannelNumberWC][nPeaks];
-  Double_t peakY[runChannelNumberWC][nPeaks];
-
   int NumberOfBins;
   Int_t EventIDsamIndex[runChannelNumberWC];
   Int_t FirstCellToPlotsamIndex[runChannelNumberWC];
+  Short_t amplValues[runChannelNumberWC][1024];
 
   TH1F hCh("hCh", "dummy;ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
-  
- 
+
   std::vector<TH1F *> hChSum;
   std::vector<TH1F> hChtemp;
   std::vector<TH1F *> hChShift;
@@ -318,7 +299,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   Float_t chargeChannelSumWOM[womCount];
   std::vector<TH1F *> histChannelSumWOM;
 
-  Short_t amplValues[runChannelNumberWC][1024];
   if (print)
   {
 
@@ -359,7 +339,7 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     hChtemp.push_back(h);
   }
 
-  TString plotSaveFolder = _outFile;
+  TString plotSaveFolder = outFile;
   plotSaveFolder.ReplaceAll((runName + ".root"), "");
   plotSaveFolder.ReplaceAll(("out.root"), "");
 
@@ -367,20 +347,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   cWaves.Divide(plotGrid, plotGrid);
   TCanvas womCanvas("womCanvas", "womCanvas", 1000, 1000);
   womCanvas.Divide(2, 2);
-
-  //TCanvas cCh0("cCh0", "cCh0", 1500, 900);
-  //cCh0.Divide(2, 2);
-  //TCanvas cTrig("cTrig", "cTrig", 1500, 900);
-  //cTrig.Divide(2, 2);
-  // TCanvas cSignal("cSignal", "cSignal", 1500, 900);
-  //cSignal.Divide(2, 2);
   TCanvas cChSum("cChSum", "cChSum", 1500, 900);
   cChSum.Divide(plotGrid, plotGrid);
-  //TCanvas sum_total("sum_total", "sum_total", 1500, 900);
-  //sum_total.Divide(2);
-  // clibrated sum
-  //TCanvas C_amp_array("C_amp_array", "C_amp_array", 1000, 700);
-  //C_amp_array.Divide(plotGrid, plotGrid);
 
   /*Create branches in the root-tree for the data.*/
   tree->Branch("EventNumber", &EventNumber, "EventNumber/I");
@@ -417,10 +385,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   //tree->Branch("Integral_0_300", Integral_0_300, "Integral_0_300[nCh]/F");
   //tree->Branch("Integral_inRange", Integral_inRange, "Integral_inRange[nCh]/F");
   tree->Branch("Integral", Integral, "Integral[nCh]/F"); // calibrated
-                                                         // tree->Branch("Integral_mVns", Integral_mVns, "Integral_mVns[nCh]/F"); // calibrated
-   tree->Branch("IntegralDifference", IntegralDiff, "IntegralDifference[nCh]/F");
- 
- 
+  // tree->Branch("Integral_mVns", Integral_mVns, "Integral_mVns[nCh]/F"); // calibrated
+  tree->Branch("IntegralDifference", IntegralDiff, "IntegralDifference[nCh]/F");
+
   // TIMING
   tree->Branch("t", t, "t[nCh]/F");
   tree->Branch("tSiPM", tSiPM, "tSiPM[nCh]/F");
@@ -436,40 +403,37 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   tree->Branch("BL_used", BL_used, "BL_used[nCh]/F");
   tree->Branch("BL_Chi2_used", BL_Chi2_used, "BL_Chi2_used[nCh]/F");
   tree->Branch("BL_pValue_used", BL_pValue_used, "BL_pValue_used[nCh]/F");
-  // PEAKFINDER
-  tree->Branch("noiseLevel", noiseLevel, "noiseLevel[nCh]/F");
-  tree->Branch("peakX", peakX, "peakX[nCh][4]/D");
-  tree->Branch("peakY", peakY, "peakY[nCh][4]/D");
   // CALIBRATED SUM
   tree->Branch("chargeChannelSumWOM", chargeChannelSumWOM, "chargeChannelSumWOM[4]/F");
   tree->Branch("amplitudeChannelSumWOM", amplitudeChannelSumWOM, "amplitudeChannelSumWOM[4]/F");
-
-  //  tree->Branch("chPE_int", channelSumWOM_amp, "chPE_int[nCh]/F");
-
   tree->Branch("EventIDsamIndex", EventIDsamIndex, "EventIDsamIndex[nCh]/I");
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
 
- // tree->Branch("RawData",amplValues,"amplValues[32][1024]/S");
 
+/***
+ *     __   ___       __          __      __  ___       __  ___ 
+ *    |__) |__   /\  |  \ | |\ | / _`    /__`  |   /\  |__)  |  
+ *    |  \ |___ /~~\ |__/ | | \| \__>    .__/  |  /~~\ |  \  |  
+ *                                                              
+ */
 
-  struct rusage r_usage;
 
   /*Start reading the raw data from .bin files.*/
   int nitem = 1;
   ifstream inList;
   TString fileName;
-  inList.open(_inFileList);
+  inList.open(inFileList);
   assert(inList.is_open());
 
   //Get Binary File Count
-  ifstream countStream(_inFileList);
+  ifstream countStream(inFileList);
   numberOfBinaryFiles = count(std::istreambuf_iterator<char>(countStream),
                               std::istreambuf_iterator<char>(), '\n');
   countStream.close();
 
   //Get First Line File Name-> for printing
   string tempFileName;
-  ifstream tempName(_inFileList);
+  ifstream tempName(inFileList);
   if (tempName.good())
   {
     getline(tempName, tempFileName);
@@ -487,35 +451,44 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
   {
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
-    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::RUN PARAMETER:::::::::::::::::::::::::::::::::::::::" << endl;
-    cout << "RunNr: " << runNumber << endl;
-    cout << "Position: " << runPosition << endl;
-    cout << "Angle: " << runAngle << endl;
-    cout << "Energy: " << runEnergy << endl;
-    cout << "Channel/WC: " << runChannelNumberWC << endl;
-    cout << ":::::::::::::::::::FILE PARAMETER::::::::::::::::::::::::::::::::::::::" << endl;
-    cout << "RunName: " << runName << endl;
-    cout << "headerSize Input: " << _headerSize << endl;
-    cout << "InDataFolder: " << _inDataFolder.Data() << endl;
-    cout << "OutFile: " << _outFile << endl;
+  
+
+  // Iterate through all elements in std::map
+    map<string,string>::iterator it = readParameters.begin();
+    while(it != readParameters.end())
+    {
+        cout<<it->first<<" :: "<<it->second<<endl;
+        it++;
+    }
     cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << "isDC: " <<isDC<< endl;
     cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
-    cout << "Amplitude Calibration: " << vectorToString(calib_amp) << endl;
-    cout << "Charge Calibration: " << vectorToString(calib_charge) << endl;
-    cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(isCalibrated) << endl;
-    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
-    cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
+    cout << "Charge Calibration: " << vectorToString(calibrationCharges) << endl;
+    cout << "Charge CalibrationErr: " << vectorToString(calibrationChargeErrors) << endl;
+
+   cout << "IntegrationWindowPeak: " << vectorToString(integrationWindowsPeakSignal) << endl;
+    cout << "IntegrationWindowEntire: " << vectorToString(integrationWindowsEntireSignal) << endl;
+    cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(useConstCalibValues) << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
   }
 
   int fileCounter = 0;
   int currentPrint = -1;
+  
+
+/***
+ *     ___         ___          __   __   __  
+ *    |__  | |    |__     |    /  \ /  \ |__) 
+ *    |    | |___ |___    |___ \__/ \__/ |    
+ *                                            
+ */
+
   while (inList >> fileName)
   {
 
-    fileName = _inDataFolder + fileName;
+    fileName = inDataFolder + fileName;
     cout << fileName << endl;
     FILE *pFILE = fopen(fileName.Data(), "rb");
     if (pFILE == NULL)
@@ -527,7 +500,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     float totFileSizeByte = ftell(pFILE);
     rewind(pFILE);
 
-    if (_headerSize == "a")
+
+/***
+ *          ___       __   ___  __                              __     __  
+ *    |__| |__   /\  |  \ |__  |__)     /\  |\ |  /\  |    \ / /__` | /__` 
+ *    |  | |___ /~~\ |__/ |___ |  \    /~~\ | \| /~~\ |___  |  .__/ | .__/ 
+ *                                                                         
+ */
+
+
+    if (headerSize == -1)
     {
       char versionBuffer[700];
       fread(versionBuffer, 1, 700, pFILE);
@@ -581,14 +563,23 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       word = strtok(NULL, " \n");
     }
 
-    if (true || nActiveCh > 9 || newerVersion) //Not sure why reading this byte, //if (nActiveCh > 9 || newerVersion), needs to be read in all versions 2.8.14+
-    {
-      char dummy;
-      nitem = fread(&dummy, 1, 1, pFILE);
-    }
+    //Not sure why reading this byte, //if (nActiveCh > 9 || newerVersion), needs to be read in all versions 2.8.14+
+    char dummy;
+    nitem = fread(&dummy, 1, 1, pFILE);
+
+
+  /***
+ *    $$$$$$$$\ $$\    $$\ $$$$$$$$\ $$\   $$\ $$$$$$$$\       $$\       $$$$$$\   $$$$$$\  $$$$$$$\  
+ *    $$  _____|$$ |   $$ |$$  _____|$$$\  $$ |\__$$  __|      $$ |     $$  __$$\ $$  __$$\ $$  __$$\ 
+ *    $$ |      $$ |   $$ |$$ |      $$$$\ $$ |   $$ |         $$ |     $$ /  $$ |$$ /  $$ |$$ |  $$ |
+ *    $$$$$\    \$$\  $$  |$$$$$\    $$ $$\$$ |   $$ |         $$ |     $$ |  $$ |$$ |  $$ |$$$$$$$  |
+ *    $$  __|    \$$\$$  / $$  __|   $$ \$$$$ |   $$ |         $$ |     $$ |  $$ |$$ |  $$ |$$  ____/ 
+ *    $$ |        \$$$  /  $$ |      $$ |\$$$ |   $$ |         $$ |     $$ |  $$ |$$ |  $$ |$$ |      
+ *    $$$$$$$$\    \$  /   $$$$$$$$\ $$ | \$$ |   $$ |         $$$$$$$$\ $$$$$$  | $$$$$$  |$$ |      
+ *    \________|    \_/    \________|\__|  \__|   \__|         \________|\______/  \______/ \__|                                                                                                                                                                                                                                                                                                                
+ */
 
     int whileCounter = 0;
-    /*Loop over events. Events are processed and analysed one by one in order.*/
     while (nitem > 0)
     { //event loop
 
@@ -645,10 +636,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         RawTriggerRate[i] = floatR;
         ChannelNr[i] = i;
 
-        /*
-        __ Set WOMID _________________________________________________________
-        The labeling of the WOMs in the box was done using the letters A,B,C,D. For convinience these letters are here replaced by the numbers 1-4 which is stored in the root-tree for every channel and every event.
-        */
+      
+
+/***
+ *          __              __  
+ *    |  | /  \  |\/|    | |  \ 
+ *    |/\| \__/  |  |    | |__/ 
+ *                              
+ */
+
+
         if (i < 8)
         {
           WOMID[i] = 3;
@@ -714,11 +711,16 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
 
-        /*
-        __ Baseline Fit _______________________________________________________
-        Calculate baseline values infront and after the triggered signal
-        Triggered signal is expected in the range fromm 100 to 150 ns
-        */
+       
+
+/***
+ *     __        __   ___              ___ 
+ *    |__)  /\  /__` |__  |    | |\ | |__  
+ *    |__) /~~\ .__/ |___ |___ | | \| |___ 
+ *                                         
+ */
+
+
         // BL_fit(&hChtemp.at(i), BL_output, 0.0, 75.0);
         BL_fit(&hChtemp.at(i), BL_output, 0.0, 30.0);
         BL_lower[i] = BL_output[0];
@@ -771,42 +773,17 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         }
         if (!enableBaselineCorrection)
           BL_shift = 0;
-        /*
-        __ Peakfinder / Unused _________________________________________________________
-        Implemented to search double-muon-event candiates
-        Set maximum number of peaks stored in beginning of script -> nPeaks
-        peakX/Yarray[nCh][nPeaks] stores peak coordinates as branches in tree
-        Switch on/off with pfON
-        -> when off:  set peakX/Yarray[nCh][nPeaks] to zero
-        */
-        gErrorIgnoreLevel = kError; // suppress root terminal output
 
-        bool pfON = false;
-        if (i < 15)
-        {
-          pfON = false;
-        }                     // switch on/off peakfinder
-        int sigma = 10;       // sigma of searched peaks
-        Double_t thrPF = 0.1; // peakfinder threshold
-        TPolyMarker pm;       // store polymarker showing peak position, print later
-        peakfinder(&hCh, 0, 130, nPeaks, sigma, thrPF, peakX[i], peakY[i], &pm, pfON);
+       
 
-        gErrorIgnoreLevel = defaultErrorLevel; // return to normal terminal output
+/***
+ *    ___                 __      __     __         __  
+ *     |  |  |\/| | |\ | / _`    /__` | |__)  |\/| /__` 
+ *     |  |  |  | | | \| \__>    .__/ | |     |  | .__/ 
+ *                                                      
+ */
 
-        // baseline-correct Y-values and convert to units of p.e.
-        if (pfON)
-        {
-          for (int j = 0; j < nPeaks; ++j)
-          {
-            peakY[i][j] = amp2pe(peakY[i][j], calib_amp[i], BL_shift);
-          }
-        }
 
-        /*
-        __ CFD _____________________________________________________________
-        Setting the signal time by using a constant fraction disriminator method.
-        The SiPM and the trigger sinals are handled differently using different thresholds.
-        */
         if (i == triggerChannel)
         {                                //trigger
           t[i] = CFDNegative(&hCh, 0.5); //Negative Trigger
@@ -821,54 +798,61 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
 
-        /*
-        __ Integral & Amplitude ________________________________________
-        */
+        
 
+
+
+/***
+ *           ___  ___  __   __               |                __         ___       __   ___ 
+ *    | |\ |  |  |__  / _` |__)  /\  |       |     /\   |\/| |__) |    |  |  |  | |  \ |__  
+ *    | | \|  |  |___ \__> |  \ /~~\ |___    |    /~~\  |  | |    |___ |  |  \__/ |__/ |___ 
+ *                                           |                                              
+ */
+        
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
-        float integralStartShifted = t_amp - 20;
-        float integralEndShifted = t_amp + 33;
-        float integralEndShiftedAll = t_amp + 175.5;
+        int integrationLeftOffset=20;
+        if (runName.find("calib") != std::string::npos ||isDC) {
+                correctionValues[i]=1; //exclude for calib runs
+                correctionValueErrors[i]=0; //exclude for calib runs
 
-        if (isDC || !enablePeakFinder)
-        {
-          //Always the same interval
-      //   integralStartShifted = integralStart;
-        //  integralEndShifted = integralEnd;
-        }
+              //  integrationLeftOffset=10;
+         }
+          if (isDC) {
+               t_amp=120;
+         }
+
+       
+      
+        float integralStartShifted = t_amp - integrationLeftOffset;
+        float integralEndShifted = t_amp + integrationWindowsPeakSignal[i];
+        float integralEndShiftedAll = t_amp + integrationWindowsEntireSignal[i];
+
 
         int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
         if (shiftedIndex == 32)
           shiftedIndex = 31;
-        // cout<<"INDEX" <<i<<" SHIFTED INDEX: "<<shiftedIndex<<"  VALUE: "<<calib_charge.at(shiftedIndex)<<endl;
 
-        if (enableToT)
-        {
-          Integral[i] = IntegralTimeOverThreshold(&hCh, totIntervalStart, totIntervalEnd, totThreshold, BL_shift) / calib_charge.at(shiftedIndex);
-        }
-        else
-        {
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift);
 
-          if (enableCFDIntegral)
-          {
-            float maxThr = (hCh.GetMaximum() * integralCFDThreshold);
-            int bin1 = hCh.FindFirstBinAbove(maxThr, 1, cfdSearchStart / SP, cfdSearchEnd / SP);
-            int bin2 = bin1 + (integralCFDWindow / SP);
-            integralStartShifted = bin1 * SP;
-            integralEndShifted = bin2 * SP;
-            float c1 = hCh.GetBinContent(bin1);
-            float c2 = hCh.GetBinContent(bin2);
-            Integral[i] = hCh.Integral(bin1, bin2, "width") - BL_shift * (integralEndShifted - integralStartShifted) - c1 * (integralStartShifted - hCh.GetXaxis()->GetBinLowEdge(bin1)) - c2 * (hCh.GetXaxis()->GetBinUpEdge(bin2) - integralEndShifted);
-          }
-          else
-          {
-            Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_charge.at(shiftedIndex);
-          }
+
+       
+
+        bool errorsUsed=true;
+        float calibrationError=calibrationChargeErrors[shiftedIndex];
+        float correctionValueError=correctionValueErrors[shiftedIndex];
+
+        float effectivFactor=correctionValues[shiftedIndex]/calibrationCharges.at(shiftedIndex);
+        float effectivFactorError=sqrt(pow((correctionValueError/calibrationCharges.at(shiftedIndex)),2)+pow((correctionValues[shiftedIndex]*calibrationError /pow(calibrationCharges.at(shiftedIndex),2)),2));
+
+        if(errorsUsed){
+          effectivFactor=effectivFactor+effectivFactorError;
         }
 
-        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) / calib_amp.at(shiftedIndex);
-        IntegralDiff[i]=IntegralDifference(&hCh,integralStartShifted,integralEndShifted,integralEndShiftedAll,AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift),BL_shift);
 
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift)*effectivFactor;
+        IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
+
+      
 
         if (allowVetoSkipping && i == vetoChannel)
         {
@@ -880,12 +864,18 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           }
         }
 
-
         if (WOMID[i] >= 0)
           histChannelSumWOM[WOMID[i]]->Add(&hCh);
-        /*
-        __ Printing Wafevorms ____________________________________________
-       */
+      
+
+/***
+ *     __   __         ___         __                     ___  __  
+ *    |__) |__) | |\ |  |  | |\ | / _`    |  |  /\  \  / |__  /__` 
+ *    |    |  \ | | \|  |  | | \| \__>    |/\| /~~\  \/  |___ .__/ 
+ *                                                                 
+ */
+
+
         if (print)
         {
           if (forcePrintEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
@@ -920,21 +910,10 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             TLine *leftInterval;
             TLine *rightInterval;
             TLine *endInterval;
-            if (enableToT)
-            {
-              int startBin = hCh.FindBin(totIntervalStart);
-              int endBin = hCh.FindBin(totIntervalEnd);
-              float maximum = max_inRange(&hCh, totIntervalStart,totIntervalEnd);
-              float th = (maximum * totThreshold);
-              TLine *threshold = new TLine(startBin*SP, th, endBin*SP, th);
-              threshold->Draw("same");
-           
-            }
-            
-             leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
-             rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
-             endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
-
+      
+            leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
+            rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+            endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
 
             leftInterval->SetLineColor(2);
             rightInterval->SetLineColor(2);
@@ -942,54 +921,67 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
             baselineUsed->Draw("same");
             ln4->Draw("same");
             ln5->Draw("same");
-           
-            if(!enableToT){
+
+        
             leftInterval->Draw("same");
             rightInterval->Draw("same");
             endInterval->Draw("same");
+            
+            TLegend *h_leg = new TLegend(0.65, 0.67, 1, 0.77);
+            h_leg->SetTextSize(0.015);
+            h_leg->AddEntry((TObject *)0, Form("Integral: %1.2f", Integral[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Amplitude: %1.2f", Amplitude[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Calibration Value: %1.2f +- %1.2f",  calibrationCharges.at(shiftedIndex), calibrationChargeErrors.at(shiftedIndex)), "");
+            h_leg->AddEntry((TObject *)0, Form("CF: %1.2f +- %1.2f", correctionValues[i],correctionValueErrors[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("BL: %1.2f", BL_shift), "");
+            h_leg->AddEntry((TObject *)0, Form("Percentage: %1.2f", IntegralDiff[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Eff. Factor (%1.4f): %1.4f+-%1.4f",correctionValues[shiftedIndex]/calibrationCharges.at(shiftedIndex), effectivFactor,effectivFactorError), "");
 
-            }
-            TLegend *h_leg = new TLegend(0.77, 0.67, 0.96, 0.77);
-            h_leg->AddEntry((TObject *)0, Form("Integral: %f", Integral[i]), "");
-            h_leg->AddEntry((TObject *)0, Form("Amplitude: %f", Amplitude[i]), "");
-            h_leg->AddEntry((TObject *)0, Form("Window: [%f,%f], Size: %f", integralStartShifted,integralEndShifted,(integralEndShifted-integralStartShifted)), "");
-
-
+            h_leg->AddEntry((TObject *)0, Form("Window: %1.2f, %1.2f", integrationWindowsPeakSignal[i], integrationWindowsEntireSignal[i]), "");
 
             h_leg->Draw();
 
             text->Draw("same");
-            if (pfON)
-            {
-              pm.Draw();
-            } // print peakfinders polymarker
+        
           }
           hCh.GetXaxis()->SetRange(1, 30 / SP);
           noiseLevel[i] = hCh.GetMaximum() - hCh.GetMinimum();
           hCh.GetXaxis()->SetRange(1, 1024);
           // End of loop over inividual channels
         }
+    
+    
+    
+    
+
+      if (!skipThisEvent && print)
+      {
+          TF1* f_const=new TF1("f_const","pol0",0,320);
+          f_const->SetParameter(0,BL_shift);
+          hCh.Add(f_const,-1);
+          hChSum.at(i)->Add(&hCh, 1);
+        
       }
+    
+    
+     }
 
-      /*
-      __ WOM Sums_____________________________________________________
-       Just sum up all Integrals/Amplitudes for the Channels using the Integral[] or Amplitude[] Arrays
+    
 
-      */
+/***
+ *          __            __              __  
+ *    |  | /  \  |\/|    /__` |  |  |\/| /__` 
+ *    |/\| \__/  |  |    .__/ \__/  |  | .__/ 
+ *                                            
+ */
+
+
       for (int i = 0; i < 4; i++)
       {
         womCanvas.cd(i + 1);
         histChannelSumWOM[i]->DrawCopy();
 
-        float t_amp = t_max_inRange(histChannelSumWOM[i], integralStart, integralEnd);
-        float integralStartShifted = t_amp - 10;
-        float integralEndShifted = t_amp + 15;
-        if (isDC || !enablePeakFinder)
-        {
-          //Always the same interval
-          integralStartShifted = integralStart;
-          integralEndShifted = integralEnd;
-        }
+
 
         if (i == 3)
         {
@@ -1016,17 +1008,8 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
         }
 
-        float minY = histChannelSumWOM[i]->GetMinimum();
-        float maxY = histChannelSumWOM[i]->GetMaximum();
-
-        TLine *ln4 = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
-        TLine *ln5 = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
-
-        ln4->SetLineColor(2);
-        ln5->SetLineColor(2);
-        ln4->Draw("same");
-        ln5->Draw("same");
-
+     
+  
         chargeChannelSumWOM[i] = IntegralSum[i];
         amplitudeChannelSumWOM[i] = AmplitudeSum[i];
       }
@@ -1036,9 +1019,18 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
         forcePrintEvents++;
       }
 
-      /*
-      __ TIMING _____
-      */
+     
+
+
+
+/***
+ *    ___                 __     ___  __     __   __   ___  __  
+ *     |  |  |\/| | |\ | / _`     |  |__) | / _` / _` |__  |__) 
+ *     |  |  |  | | | \| \__>     |  |  \ | \__> \__> |___ |  \ 
+ *                                                              
+ */
+
+
       trigT = t[triggerChannel];
       for (int i = 0; i < runChannelNumberWC; i++)
       {
@@ -1046,15 +1038,18 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           tSiPM[i] = t[i] - trigT;
       }
 
-      // add-up all events channel-wise, not calibrated
 
-      if (!skipThisEvent && print)
-      {
-        for (int i = 0; i < runChannelNumberWC; i++)
-        {
-          hChSum.at(i)->Add(&hChtemp.at(i), 1);
-        }
-      }
+
+
+/***
+ *     __       ___  __       ___ 
+ *    /  \ |  |  |  |__) |  |  |  
+ *    \__/ \__/  |  |    \__/  |  
+ *                                
+ */
+
+
+
 
       if ((forcePrintEvent && print) || (!skipThisEvent && print))
       {
@@ -1069,23 +1064,14 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
             womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf("), "pdf");
-            //  C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf("), "pdf");
-            //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf("), "pdf");
-            //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf("), "pdf");
+  
           }
           else
           {
             cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
             womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf"), "pdf");
-
-            // C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf"), "pdf");
-            //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf"), "pdf");
-            //cTrig.Print((TString)(plotSaveFolder + "/trig.pdf"), "pdf");
           }
         }
-    
-    
-
       }
 
       /*Writing the data for that event to the tree.*/
@@ -1097,7 +1083,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
       {
         skippedCount = skippedCount + 1;
       }
-
     }
     auto nevent = tree->GetEntries();
 
@@ -1118,10 +1103,6 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     }
     cWaves.Clear();
     womCanvas.Clear();
-    //C_amp_array.Print((TString)(plotSaveFolder + "/amp_array.pdf)"), "pdf");
-    //cSignal.Print((TString)(plotSaveFolder + "/signal.pdf)"), "pdf");
-    // cTrig.Print((TString)(plotSaveFolder + "/trig.pdf)"), "pdf");
-
     for (int i = 0; i < runChannelNumberWC; i++)
     {
       cChSum.cd(i + 1);
@@ -1130,12 +1111,9 @@ void read(TString _inFileList, TString _inDataFolder, TString _outFile, string r
     cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
   }
 
-
-
   gErrorIgnoreLevel = kWarning;
-  
+
   rootFile = tree->GetCurrentFile();
   rootFile->Write();
   rootFile->Close();
-  
 }

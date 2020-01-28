@@ -164,12 +164,12 @@ float IntegralHistCFD(TH1F *hWave, float threshold, float windowInNs, float BL)
 
 float IntegralDifference(TH1F *hWave, float leftStart, float rightEnd, float rightEndAll, float Amplitude, float BL)
 {
-  if (Amplitude < 100)
+  if (Amplitude < 10)
   {
     return -100;
   }
 
-  return abs(IntegralHist(hWave, leftStart, rightEnd, BL) / IntegralHist(hWave, leftStart, rightEndAll, BL));
+  return IntegralHist(hWave, leftStart, rightEnd, BL) / IntegralHist(hWave, leftStart, rightEndAll, BL);
 }
 /**
  * Time over the defined threshold
@@ -318,10 +318,21 @@ Returns time value of maximum amplitude in given range t1-t2
 */
 float t_max_inRange(TH1F *hWave, float t1, float t2)
 {
+  hWave->GetXaxis()->SetRange(t1 / SP, t2 / SP); //[0,320] -> [0,1024]
+ 
+  int maximumBin=hWave->GetMaximumBin();
+  int maximum=max_inRange(hWave,t1,t2);
+  int rangeToSearch=2;//2Bins -> 2*SP=0.6ns
+  int startingBin=hWave->FindFirstBinAbove(maximum,1,maximumBin-rangeToSearch,maximumBin+rangeToSearch);
+  int endBin=hWave->FindLastBinAbove(maximum,1,maximumBin-rangeToSearch,maximumBin+rangeToSearch);
+  int binMean=(endBin+startingBin)/2;
 
-  hWave->GetXaxis()->SetRange(t1 / SP, t2 / SP);
-  float t_max = hWave->GetXaxis()->GetBinCenter(hWave->GetMaximumBin());
+  //cout<<"TMAX: "<<maximumBin<<"  "<<maximum<<"  "<<startingBin<<"   "<<endBin<<"  "<<binMean<<endl;
+
+
+  float t_max = hWave->GetXaxis()->GetBinCenter(binMean);
   hWave->GetXaxis()->SetRange(1, 1024);
+  
   return t_max;
 }
 
