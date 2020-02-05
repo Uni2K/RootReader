@@ -33,6 +33,17 @@ int main(int argc, char *argv[])
   string isDC = argv[6];
   string useConstCalibValues = argv[8];
 
+  string iWForceRun = argv[16];
+  std::string::size_type i = iWForceRun.find("IW_");
+  if (i != std::string::npos)
+   iWForceRun.erase(i, 3);
+
+
+
+
+
+
+
   map<string, string> readParameters;
   readParameters.insert(make_pair("inFileList", inFileList));
   readParameters.insert(make_pair("inDataFolder", inDataFolder));
@@ -54,6 +65,8 @@ int main(int argc, char *argv[])
     readParameters.insert(make_pair("runChannelNumberWC", string(argv[14])));
  if (argc >= 16)
     readParameters.insert(make_pair("automaticWindow", string(argv[15])));
+  if (argc >= 17)
+    readParameters.insert(make_pair("iWForceRun", iWForceRun));
 
   read(readParameters);
 

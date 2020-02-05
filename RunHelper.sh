@@ -245,7 +245,7 @@ readFull() {
 
             #time $here/readFull $runDir/$runName.list $inFolder/$runName/ $runDir/out.root ${lineArr[0]} ${lineArr[2]} ${lineArr[3]} ${lineArr[4]} ${lineArr[5]} ${lineArr[6]}
 
-            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}" "$automaticWindow"
+            time ./src/read $runDir/$runName.list $inFolder/$runName/ $runDir/$runName.root $runName $headerSize "$isDC" "$dynamicBL" "$useCalibValues" "${lineArr[0]}" "${lineArr[1]}" "${lineArr[2]}" "${lineArr[3]}" "${lineArr[4]}" "${lineArr[5]}" "$automaticWindow" "$iWForceRun"
 
         fi
     done <./RootRunlist.txt
@@ -411,7 +411,8 @@ readRoot() {
 }
 
 readFastIteration() {
-    ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}" "$automaticWindow"
+
+    ./src/read $fastRunDir/$1.list $fastInFolder/$fastRunName/ $fastRunDir/$1/out.root $fastRunName $fastHeaderSize "$isDC" "$dynamicBL" "$useCalibValues" "${fastLineArr[0]}" "${fastLineArr[1]}" "${fastLineArr[2]}" "${fastLineArr[3]}" "${fastLineArr[4]}" "${fastLineArr[5]}" "$automaticWindow" "$iWForceRun"
 
 }
 
@@ -478,6 +479,63 @@ loadConfig() {
 
     fi
 }
+startAutomaticDCRun() {
+    #Goal: Calculate 2 DC Limits, with 1 calib IW and measurement IW -> 2 DC Analysis, with different IW
+
+    dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
+
+    rootfileFolderDir=$analysisPath/rootfiles
+    echo "Select DC Run:"
+    read runNumber
+    echo "Select Run, from which the IW is coming (needs to be in IntegrationWindows.txt) (ALL=a, Example: 22 OR multiple: 31,32,40 OR range: 10-15 OR combined):"
+    read runNumberRaw
+    runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
+    # echo "${runNumber[*]}"
+
+
+    for i in "${runNumberRaw[@]}"; do
+        :
+        if [[ $i == *"-"* ]]; then
+            range=($(echo $i | tr "-" "\n"))
+            startValue=${range[0]}
+            endValue=${range[1]}
+
+            while [ $startValue -le $endValue ]; do
+                runNumberRaw=("$startValue" "${runNumberRaw[@]}")
+                startValue=$(($startValue + 1))
+            done
+        fi
+
+        #Remove Range
+        unset aMRun
+        for z in "${runNumberRaw[@]}"; do
+            :
+            if [[ $z != *"-"* ]]; then
+                aMRun=("$z" "${aMRun[@]}")
+            fi
+        done
+    done
+
+    for wRun in "${aMRun[@]}"; do
+        #find runname
+        aRunName=$(grep -I "IW_$wRun" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
+        echo "Using $aRunName"
+        iWForceRun=$aRunName
+        automaticWindow=false
+        #start DC reading with IW from aRunName
+        start
+        echo "Moving files..."
+      
+        suffix="iw$wRun"
+        path=$(find . -type f -name "${runNumber}_*" -a -name '*.root');
+        cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"
+        
+
+    done
+
+    #python $dcScriptDir/DCProbability.py
+
+}
 
 startAutomaticBaseline() {
     while true; do
@@ -524,7 +582,7 @@ startAutomaticBaseline() {
                 for n in ${runNumber[@]}; do
                     find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
                 done
-                 echo "Automatic Baseline done!"
+                echo "Automatic Baseline done!"
 
                 break 2
                 ;;
@@ -535,87 +593,81 @@ startAutomaticBaseline() {
 }
 
 startAutomaticIntegration() {
-    
-        echo "Start? (Run:  ${runNumber[*]})"
-        select yn in "Yes" "No"; do
-            case $yn in
 
-            \
-                "No")
-                break 2
-                ;;
+    echo "Start? (Run:  ${runNumber[*]})"
+    select yn in "Yes" "No"; do
+        case $yn in
 
-            "Yes")
-                echo "Started for runs: (${runNumber[*]}) "
+        \
+            "No")
+            break 2
+            ;;
 
-                iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
-                rootfileFolderDir=$analysisPath/rootfiles
+        "Yes")
+            echo "Started for runs: (${runNumber[*]}) "
 
-                echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
-                echo "Yes -> starts automatic Baseline File creation"
-                select yn in "Create" "Copy" "Continue"; do
-                    case $yn in
-                    "Create")
-                        echo "Start creating Rootfiles with a constant Baseline? (Run: $runNumber)"
-                        startAutomaticBaseline
-                        break 
-                        ;;
-                    "Continue")
-                        break 
-                        ;;
-                    "Copy")
-                        for n in ${runNumber[@]}; do
-                            find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
-                        done
-                        break 
-                        ;;
-                    esac
-                done
+            iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
+            rootfileFolderDir=$analysisPath/rootfiles
 
-                echo "Location of the Integration Scripts $iwScriptDir"
-                echo "Location of the Rootfile Folder  $rootfileFolderDir"
+            echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
+            echo "Yes -> starts automatic Baseline File creation"
+            select yn in "Create" "Copy" "Continue"; do
+                case $yn in
+                "Create")
+                    echo "Start creating Rootfiles with a constant Baseline? (Run: $runNumber)"
+                    startAutomaticBaseline
+                    break
+                    ;;
+                "Continue")
+                    break
+                    ;;
+                "Copy")
+                    for n in ${runNumber[@]}; do
+                        find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                    done
+                    break
+                    ;;
+                esac
+            done
 
-                echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
-                ($iwScriptDir/IntegrationWindowAnalysis.sh)
-                echo "Done Integration Window Script! "
-                echo "Moving IntegrationWindows.txt to RunHelper/src"
-                cwd=$(pwd)
-                find $iwScriptDir -type f -name "IntegrationWindows.txt" -exec cp {} $cwd/src/ \;
+            echo "Location of the Integration Scripts $iwScriptDir"
+            echo "Location of the Rootfile Folder  $rootfileFolderDir"
 
-                automaticWindow=true #make sure this is on
-                echo "Run with new Integration Windows... "
-                start
-                echo "Moving files..."
-                for n in ${runNumber[@]}; do
-                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
-                done
+            echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
+            ($iwScriptDir/IntegrationWindowAnalysis.sh)
+            echo "Done Integration Window Script! "
+            echo "Moving IntegrationWindows.txt to RunHelper/src"
+            cwd=$(pwd)
+            find $iwScriptDir -type f -name "IntegrationWindows.txt" -exec cp {} $cwd/src/ \;
 
-                 echo "Calculating the Correction Factor..."
-                ($iwScriptDir/IntegrationWindowAnalysis.sh)
-                echo "Done Integration Window Script! "
-                echo "Moving CorrectionValues.txt to RunHelper/src"
-                cwd=$(pwd)
-                find $iwScriptDir -type f -name "CorrectionValues.txt" -exec cp {} $cwd/src/ \;
-                
-                echo "Run with Correction Factor... "
-                start
-                echo "Moving files..."
-                for n in ${runNumber[@]}; do
-                    find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
-                done   
+            automaticWindow=true #make sure this is on
+            echo "Run with new Integration Windows... "
+            start
+            echo "Moving files..."
+            for n in ${runNumber[@]}; do
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+            done
 
-                 echo "Automatic Integration Done"
+            echo "Calculating the Correction Factor..."
+            ($iwScriptDir/IntegrationWindowAnalysis.sh)
+            echo "Done Integration Window Script! "
+            echo "Moving CorrectionValues.txt to RunHelper/src"
+            cwd=$(pwd)
+            find $iwScriptDir -type f -name "CorrectionValues.txt" -exec cp {} $cwd/src/ \;
 
+            echo "Run with Correction Factor... "
+            start
+            echo "Moving files..."
+            for n in ${runNumber[@]}; do
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+            done
 
+            echo "Automatic Integration Done"
 
-
-
-
-                break
-                ;;
-            esac
-        done
-   
+            break
+            ;;
+        esac
+    done
 
 }
 
@@ -698,6 +750,7 @@ isDC="0"
 nameSchema="2019"
 checkAutomaticConfig
 loadAnalysisPath
+
 echo "-------------------------------------------------------"
 
 echo "Select an option!"
@@ -902,7 +955,7 @@ while true; do
 
         "Tools")
             while true; do
-                select yn in "Automatic Baseline Run" "Automatic Integration Run" "<- Back"; do
+                select yn in "Automatic Baseline Run" "Automatic Integration Run" "Automatic Dark Count Runs" "<- Back"; do
                     case $yn in
 
                     \
@@ -978,7 +1031,40 @@ while true; do
 
                         break 2
                         ;;
+                    "Automatic Dark Count Runs")
+                        echo "This will start an automatic run, calculating Dark Count Limits for multiple integration windows!"
+                        if [ -z ${analysisPath+x} ]; then
+                            echo "Your analysis script path is not set. Do it now:"
+                            analysisPath=$(zenity --file-selection --directory --title "Select Analysis Script path")
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                saveAnalysisPath
+                            fi
 
+                            echo "Your analysis script path is: $analysisPath"
+                            echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                            startAutomaticDCRun
+
+                        else
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                echo "Your analysis script path is: $analysisPath"
+                                echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                                startAutomaticDCRun
+                            fi
+
+                        fi
+
+                        # echo "Your analysis script path is set to: $analysisPath"
+
+                        #outFolder=$(zenity --file-selection --directory --title "Select output Folder (.bin Files)?")
+
+                        break 2
+                        ;;
                     esac
 
                 done
