@@ -114,7 +114,7 @@ bool allowBaselineEventSkipping = false;
 int skipInChannel = 0;
 //Skip events that exceed the WC maximum, does not include TriggerChannel
 bool allowExceedingEventSkipping = true;
-int exceedingThreshold = 650;
+int exceedingThreshold = 600;
 //Skip veto events -> if channel sees something-> Skip
 bool allowVetoSkipping = false;
 int vetoChannel = 9;
@@ -124,7 +124,7 @@ bool zoomedInWaves = false; //Zoom in the waves.pdf on the signal range
 
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
-bool allowForcePrintEvents = false;
+bool allowForcePrintEvents = true;
 bool forcePrintThisEvent = false;
 int maximalForcePrintEvents = 20;
 int forcePrintEvents = 0;
@@ -716,7 +716,7 @@ void read(map<string, string> readParameters)
           }
           else
           {
-            skipThisEvent = false;
+          //  skipThisEvent = false;
           }
       
         }
@@ -765,7 +765,7 @@ void read(map<string, string> readParameters)
         }
         else
         {
-          skipThisEvent = false;
+         // skipThisEvent = false;
         }
       }
 
@@ -848,6 +848,17 @@ void read(map<string, string> readParameters)
 
       IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
 
+     
+     if(i<9){
+      if(IntegralDiff[i]>1 || Integral[i]>595 ){
+        if(!skipThisEvent)forcePrintThisEvent=true;
+      }
+     }
+
+
+
+
+
       if (allowVetoSkipping && i == vetoChannel)
       {
         float ampForVeto = AmplitudeHist(&hCh, 0, 300, 0); //Search Everywhere
@@ -870,7 +881,8 @@ void read(map<string, string> readParameters)
 
       if (print)
       {
-        if (allowForcePrintEvents || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+      //  if(!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents)))){
+        if ((forcePrintThisEvent && (forcePrintEvents<maximalForcePrintEvents)) || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
         {
 
           cWaves.cd(i + 1);
@@ -921,7 +933,7 @@ void read(map<string, string> readParameters)
           TLegend *h_leg = new TLegend(0.62, 0.67, 1, 1);
           h_leg->SetTextSize(0.015);
           if (allowForcePrintEvents)
-            h_leg->AddEntry((TObject *)0, Form("ForcePrinted: %d, Count: %d", forcePrintThisEvent, forcePrintEvents), "");
+            h_leg->AddEntry((TObject *)0, Form("ForcePrinted: %d, Count: %d, Skip: %d", forcePrintThisEvent, forcePrintEvents, skipThisEvent), "");
           h_leg->AddEntry((TObject *)0, Form("Integral: %1.2f /ErrP(%1.2f)/ErrM(%1.2f)", Integral[i], IntegralErrorP[i], IntegralErrorM[i]), "");
           h_leg->AddEntry((TObject *)0, Form("Amplitude: %1.2f", Amplitude[i]), "");
           h_leg->AddEntry((TObject *)0, Form("Calibration Value: %1.2f +- %1.2f", calibrationCharges.at(shiftedIndex), calibrationChargeErrors.at(shiftedIndex)), "");
@@ -1043,11 +1055,11 @@ void read(map<string, string> readParameters)
  *                                
  */
 
-    if ((forcePrintThisEvent && print) || (!skipThisEvent && print))
+    if (print)
     {
 
-      /*Saving the plotted signals/events to a new page in the .pdf file.*/
-      if (forcePrintThisEvent || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+      if(!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents)))){
+      if ((forcePrintThisEvent && (forcePrintEvents<maximalForcePrintEvents))  || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
       {
         if (printExtraEvents)
           printedExtraEvents++;
@@ -1065,7 +1077,7 @@ void read(map<string, string> readParameters)
           womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf"), "pdf");
         }
       }
-    }
+    }}
 
     /*Writing the data for that event to the tree.*/
     if (!skipThisEvent)
