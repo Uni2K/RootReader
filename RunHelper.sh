@@ -518,7 +518,7 @@ startAutomaticDCRun() {
 
     for wRun in "${aMRun[@]}"; do
         #find runname
-        aRunName=$(grep -I "IW_$wRun" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
+        aRunName=$(grep -I "IW_${wRun}_pos" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
         echo "Using $aRunName"
         iWForceRun=$aRunName
         automaticWindow=false
@@ -527,9 +527,13 @@ startAutomaticDCRun() {
         echo "Moving files..."
       
         suffix="iw$wRun"
-        path=$(find . -type f -name "${runNumber}_*" -a -name '*.root');
-        cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"
-        
+        path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root');
+        echo "path: $path"
+        if cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"
+            then echo Moving successfull!
+        else
+            exit 222
+        fi
 
     done
 
