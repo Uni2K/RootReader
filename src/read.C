@@ -120,11 +120,11 @@ bool allowVetoSkipping = false;
 int vetoChannel = 9;
 int vetoThreshold = 5; //abs Value -> compares with Amplitude
 
-bool zoomedInWaves = false; //Zoom in the waves.pdf on the signal range
+bool zoomedInWaves = true; //Zoom in the waves.pdf on the signal range
 
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
-bool allowForcePrintEvents = true;
+bool allowForcePrintEvents = false;
 bool forcePrintThisEvent = false;
 int maximalForcePrintEvents = 20;
 int forcePrintEvents = 0;
@@ -851,7 +851,7 @@ void read(map<string, string> readParameters)
      
      if(i<9){
       if(IntegralDiff[i]>1 || Integral[i]>595 ){
-        if(!skipThisEvent)forcePrintThisEvent=true;
+      //  if(!skipThisEvent)forcePrintThisEvent=true;
       }
      }
 
@@ -990,8 +990,8 @@ void read(map<string, string> readParameters)
 
         if (IntegralSum[3] < 10)
         {
-          if(allowForcePrintEvents)
-          forcePrintThisEvent = true;
+         //fore if(allowForcePrintEvents)
+        //  forcePrintThisEvent = true;
         }
       }
       else if (i == 2)
