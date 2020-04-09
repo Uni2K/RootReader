@@ -422,7 +422,7 @@ saveConfig() {
     echo "$inFolder" >>"$destdir"
     echo "$outFolder" >>"$destdir"
     echo "$threads" >>"$destdir"
-    echo "$runNumber" >>"$destdir"
+    echo "${runNumber[@]}" >>"$destdir"
     echo "$headerSize" >>"$destdir"
     echo "$isDC" >>"$destdir"
     echo "$dynamicBL" >>"$destdir"
@@ -466,7 +466,8 @@ loadConfig() {
         inFolder=$(awk 'NR == 1' config.txt)
         outFolder=$(awk 'NR == 2' config.txt)
         threads=$(awk 'NR == 3' config.txt)
-        runNumber=$(awk 'NR == 4' config.txt)
+        runNumberTemp=$(awk 'NR == 4' config.txt)
+        runNumber=($runNumberTemp)
         headerSize=$(awk 'NR == 5' config.txt)
         isDC=$(awk 'NR == 6' config.txt)
         dynamicBL=$(awk 'NR == 7' config.txt)
@@ -479,58 +480,138 @@ loadConfig() {
 
     fi
 }
+
+startAutomaticEffRun() {
+    echo "Start? (Run:  ${runNumber[*]})"
+    select yn in "Yes" "No"; do
+        case $yn in
+
+        \
+            "No")
+            break 2
+            ;;
+
+        "Yes")
+            echo "Started for runs: (${runNumber[*]}) "
+
+            iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
+            rootfileFolderDir=$analysisPath/rootfiles
+
+            echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
+            echo "Yes -> starts automatic Baseline File creation"
+            select yn in "Create" "Copy" "Continue"; do
+                case $yn in
+                "Create")
+                    echo "Start creating Rootfiles with a constant Baseline? (Run: ${runNumber[*]})"
+                    startAutomaticBaseline
+                    break
+                    ;;
+                "Continue")
+                    break
+                    ;;
+                "Copy")
+                    for n in ${runNumber[@]}; do
+                        find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                    done
+                    break
+                    ;;
+                esac
+            done
+            echo "Select DC Run:"
+            read runNumberDC
+
+            echo "Location of the Integration Scripts $iwScriptDir"
+            echo "Location of the Rootfile Folder  $rootfileFolderDir"
+
+            echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
+            ($iwScriptDir/IntegrationWindowAnalysis.sh)
+            echo "Done Integration Window Script! "
+            echo "Moving IntegrationWindows.txt to RunHelper/src"
+            cwd=$(pwd)
+            find $iwScriptDir -type f -name "IntegrationWindows.txt" -exec cp {} $cwd/src/ \;
+
+            automaticWindow=true #make sure this is on
+            echo "Run with new Integration Windows... "
+            start
+            echo "Moving files..."
+            for n in ${runNumber[@]}; do
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+            done
+
+            echo "Calculating the Correction Factor..."
+            ($iwScriptDir/IntegrationWindowAnalysis.sh)
+            echo "Done Integration Window Script! "
+            echo "Moving CorrectionValues.txt to RunHelper/src"
+            cwd=$(pwd)
+            find $iwScriptDir -type f -name "CorrectionValues.txt" -exec cp {} $cwd/src/ \;
+
+            echo "Run with Correction Factor... "
+            start
+            echo "Moving files..."
+            for n in ${runNumber[@]}; do
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+            done
+
+            echo "Automatic Integration Done"
+
+            dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
+
+            rootfileFolderDir=$analysisPath/rootfiles
+
+            for wRun in "${runNumber[@]}"; do
+                #find runname
+                aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
+                echo "Using $aRunName"
+                iWForceRun=$aRunName
+                automaticWindow=false
+                #start DC reading with IW from aRunName
+                start
+                echo "Moving files..."
+
+                suffix="iw$wRun"
+                path=$(find . -type f -name "${runNumberDC}_dc*" -a -name '*.root')
+                echo "path: $path"
+                if cp $path "$rootfileFolderDir/${runNumberDC}_dc_${suffix}.root"; then
+                    echo Moving successfull!
+                else
+                    exit 222
+                fi
+
+            done
+
+            break
+            ;;
+        esac
+    done
+
+}
+
 startAutomaticDCRun() {
     #Goal: Calculate 2 DC Limits, with 1 calib IW and measurement IW -> 2 DC Analysis, with different IW
 
     dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
 
     rootfileFolderDir=$analysisPath/rootfiles
+
+    echo "Using runs: ${runNumber[*]}"
     echo "Select DC Run:"
-    read runNumber
-    echo "Select Run, from which the IW is coming (needs to be in IntegrationWindows.txt) (ALL=a, Example: 22 OR multiple: 31,32,40 OR range: 10-15 OR combined):"
-    read runNumberRaw
-    runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
-    # echo "${runNumber[*]}"
+    read runNumberDC
 
-
-    for i in "${runNumberRaw[@]}"; do
-        :
-        if [[ $i == *"-"* ]]; then
-            range=($(echo $i | tr "-" "\n"))
-            startValue=${range[0]}
-            endValue=${range[1]}
-
-            while [ $startValue -le $endValue ]; do
-                runNumberRaw=("$startValue" "${runNumberRaw[@]}")
-                startValue=$(($startValue + 1))
-            done
-        fi
-
-        #Remove Range
-        unset aMRun
-        for z in "${runNumberRaw[@]}"; do
-            :
-            if [[ $z != *"-"* ]]; then
-                aMRun=("$z" "${aMRun[@]}")
-            fi
-        done
-    done
-
-    for wRun in "${aMRun[@]}"; do
+    for wRun in "${runNumber[@]}"; do
         #find runname
-        aRunName=$(grep -I "IW_${wRun}_pos" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
+        aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
         echo "Using $aRunName"
         iWForceRun=$aRunName
         automaticWindow=false
         #start DC reading with IW from aRunName
         start
         echo "Moving files..."
-      
+
         suffix="iw$wRun"
-        path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root');
+        path=$(find . -type f -name "${runNumberDC}_dc*" -a -name '*.root')
         echo "path: $path"
-        if cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"
-            then echo Moving successfull!
+        if cp $path "$rootfileFolderDir/${runNumberDC}_dc_${suffix}.root"; then
+            echo Moving successfull!
         else
             exit 222
         fi
@@ -618,7 +699,7 @@ startAutomaticIntegration() {
             select yn in "Create" "Copy" "Continue"; do
                 case $yn in
                 "Create")
-                    echo "Start creating Rootfiles with a constant Baseline? (Run: $runNumber)"
+                    echo "Start creating Rootfiles with a constant Baseline? (Run: ${runNumber[*]})"
                     startAutomaticBaseline
                     break
                     ;;
@@ -690,7 +771,7 @@ start() {
     echo "Output data folder: $outFolder"
     echo "Compiles the scripts: $shouldCompile"
     echo "Threads: $threads"
-    echo "RunNumber: $runNumber"
+    echo "RunNumber: ${runNumber[*]}"
     echo "Use Existing RunList: $useExistingRunList"
     echo "Header Size: $headerSize"
     echo "Automatic Config: $automaticConfig"
@@ -926,7 +1007,7 @@ while true; do
             ;;
 
         \
-            "RunNumber ($runNumber)")
+            "RunNumber (${runNumber[*]})")
             echo "Enter a runNumber (ALL=a, Example: 22 OR multiple: 31,32,40 OR range: 10-15 OR combined)"
             read runNumberRaw
             runNumberRaw=($(echo "$runNumberRaw" | tr ',' '\n'))
@@ -959,7 +1040,7 @@ while true; do
 
         "Tools")
             while true; do
-                select yn in "Automatic Baseline Run" "Automatic Integration Run" "Automatic Dark Count Runs" "<- Back"; do
+                select yn in "Automatic Baseline Run" "Automatic Integration Run" "Automatic Dark Count Runs" "Automatic Efficiency Run" "<- Back"; do
                     case $yn in
 
                     \
@@ -1059,6 +1140,40 @@ while true; do
                                 echo "If you want to change it, just delete or edit the file: analysisPath.txt"
 
                                 startAutomaticDCRun
+                            fi
+
+                        fi
+
+                        # echo "Your analysis script path is set to: $analysisPath"
+
+                        #outFolder=$(zenity --file-selection --directory --title "Select output Folder (.bin Files)?")
+
+                        break 2
+                        ;;
+                    "Automatic Efficiency Run")
+                        echo "This will start an automatic run, calculating DC Limit and IW."
+                        if [ -z ${analysisPath+x} ]; then
+                            echo "Your analysis script path is not set. Do it now:"
+                            analysisPath=$(zenity --file-selection --directory --title "Select Analysis Script path")
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                saveAnalysisPath
+                            fi
+
+                            echo "Your analysis script path is: $analysisPath"
+                            echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                            startAutomaticEffRun
+
+                        else
+                            if test -z "$analysisPath"; then
+                                echo "Analysis Path not set!"
+                            else
+                                echo "Your analysis script path is: $analysisPath"
+                                echo "If you want to change it, just delete or edit the file: analysisPath.txt"
+
+                                startAutomaticEffRun
                             fi
 
                         fi

@@ -116,7 +116,7 @@ int skipInChannel = 0;
 bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 600;
 //Skip veto events -> if channel sees something-> Skip
-bool allowVetoSkipping = false;
+bool allowVetoSkipping =false;
 int vetoChannel = 9;
 int vetoThreshold = 5; //abs Value -> compares with Amplitude
 
@@ -204,6 +204,13 @@ void read(map<string, string> readParameters)
     calibrationChargeErrors = pairIW.second;
   }
   string iwSelection = runName;
+
+ if (runName.find("cosmics") != std::string::npos)
+  {
+      allowVetoSkipping=true;
+  }
+
+
   if (runName.find("dc") != std::string::npos)
   {
     isDC = true;
@@ -426,6 +433,9 @@ void read(map<string, string> readParameters)
   tree->Branch("EventIDsamIndex", EventIDsamIndex, "EventIDsamIndex[nCh]/I");
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
 
+
+  tree->Branch("nSkipped", skippedCount, "nSkipped/I");
+
   /***
  *     __   ___       __          __      __  ___       __  ___ 
  *    |__) |__   /\  |  \ | |\ | / _`    /__`  |   /\  |__)  |  
@@ -477,6 +487,7 @@ void read(map<string, string> readParameters)
     }
     cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << "isDC: " << isDC << endl;
+    cout << "allowVetoSkipping: " << allowVetoSkipping<< endl;
     cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
     cout << "Charge Calibration: " << vectorToString(calibrationCharges) << endl;
     cout << "Charge CalibrationErr: " << vectorToString(calibrationChargeErrors) << endl;
@@ -484,6 +495,9 @@ void read(map<string, string> readParameters)
     cout << "IntegrationWindowPeak: " << vectorToString(integrationWindowsPeakSignal) << endl;
     cout << "IntegrationWindowEntire: " << vectorToString(integrationWindowsEntireSignal) << endl;
     cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(useConstCalibValues) << endl;
+  
+   cout << "CorrectionValues: " << vectorToString(correctionValues) << endl;
+    cout << "CorrectionValuesErrors: " << vectorToString(correctionValueErrors) << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
   }
@@ -814,8 +828,8 @@ void read(map<string, string> readParameters)
       int integrationLeftOffset = 20;
       if (runName.find("calib") != std::string::npos)
       {
-        correctionValues[i] = 1;      //exclude for calib runs
-        correctionValueErrors[i] = 0; //exclude for calib runs
+        //correctionValues[i] = 1;      //exclude for calib runs
+      //  correctionValueErrors[i] = 0; //exclude for calib runs
         integrationLeftOffset = 10;
       }
       bool dynamicDCWindow=true; //DO NOT CHANGE, Unless you know what you do
@@ -1119,6 +1133,24 @@ if (print)
 gErrorIgnoreLevel = kWarning;
 
 rootFile = tree->GetCurrentFile();
+
+//int skipcount= &skippedCount;
+//gDirectory->WriteObject(skipcount,"skippedCount");
+
 rootFile->Write();
 rootFile->Close();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
