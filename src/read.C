@@ -116,15 +116,15 @@ int skipInChannel = 0;
 bool allowExceedingEventSkipping = true;
 int exceedingThreshold = 600;
 //Skip veto events -> if channel sees something-> Skip
-bool allowVetoSkipping =false;
+bool allowVetoSkipping = false;
 int vetoChannel = 9;
-int vetoThreshold = 5; //abs Value -> compares with Amplitude
+int vetoThreshold = 4; //abs Value -> compares with Amplitude
 
-bool zoomedInWaves = true; //Zoom in the waves.pdf on the signal range
+bool zoomedInWaves = false; //Zoom in the waves.pdf on the signal range
 
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
-bool allowForcePrintEvents = false;
+bool allowForcePrintEvents = true;
 bool forcePrintThisEvent = false;
 int maximalForcePrintEvents = 20;
 int forcePrintEvents = 0;
@@ -205,11 +205,10 @@ void read(map<string, string> readParameters)
   }
   string iwSelection = runName;
 
- if (runName.find("cosmics") != std::string::npos)
+  if (runName.find("cosmics") != std::string::npos)
   {
-      allowVetoSkipping=true;
+    allowVetoSkipping = true;
   }
-
 
   if (runName.find("dc") != std::string::npos)
   {
@@ -433,7 +432,6 @@ void read(map<string, string> readParameters)
   tree->Branch("EventIDsamIndex", EventIDsamIndex, "EventIDsamIndex[nCh]/I");
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
 
-
   tree->Branch("nSkipped", skippedCount, "nSkipped/I");
 
   /***
@@ -487,7 +485,7 @@ void read(map<string, string> readParameters)
     }
     cout << ":::::::::::::::::::CALIBRATION:::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << "isDC: " << isDC << endl;
-    cout << "allowVetoSkipping: " << allowVetoSkipping<< endl;
+    cout << "allowVetoSkipping: " << allowVetoSkipping << endl;
     cout << "Baselines(Constant): " << vectorToString(BL_const) << endl;
     cout << "Charge Calibration: " << vectorToString(calibrationCharges) << endl;
     cout << "Charge CalibrationErr: " << vectorToString(calibrationChargeErrors) << endl;
@@ -495,8 +493,8 @@ void read(map<string, string> readParameters)
     cout << "IntegrationWindowPeak: " << vectorToString(integrationWindowsPeakSignal) << endl;
     cout << "IntegrationWindowEntire: " << vectorToString(integrationWindowsEntireSignal) << endl;
     cout << "Is DarkCount: " << btoa(isDC) << " Dynamic Baseline: " << btoa(switch_BL) << " Is Calibrated: " << btoa(useConstCalibValues) << endl;
-  
-   cout << "CorrectionValues: " << vectorToString(correctionValues) << endl;
+
+    cout << "CorrectionValues: " << vectorToString(correctionValues) << endl;
     cout << "CorrectionValuesErrors: " << vectorToString(correctionValueErrors) << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
     cout << ":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::" << endl;
@@ -722,7 +720,7 @@ void read(map<string, string> readParameters)
 
         if (i != triggerChannel && max[i] > exceedingThreshold)
         {
-        // forcePrintThisEvent = true;
+          // forcePrintThisEvent = true;
 
           if (allowExceedingEventSkipping && !skipThisEvent)
           {
@@ -730,427 +728,431 @@ void read(map<string, string> readParameters)
           }
           else
           {
-          //  skipThisEvent = false;
+            //  skipThisEvent = false;
           }
-      
         }
-      
 
-      /***
+        /***
  *     __        __   ___              ___ 
  *    |__)  /\  /__` |__  |    | |\ | |__  
  *    |__) /~~\ .__/ |___ |___ | | \| |___ 
  *                                         
  */
 
-      // BL_fit(&hChtemp.at(i), BL_output, 0.0, 75.0);
-      BL_fit(&hChtemp.at(i), BL_output, 0.0, 30.0);
-      BL_lower[i] = BL_output[0];
-      BL_RMS_lower[i] = BL_output[1];
-      BL_Chi2_lower[i] = BL_output[2];
-      BL_pValue_lower[i] = BL_output[3];
-      // BL_fit(&hChtemp.at(i), BL_output, 220.0, 320.0);
+        // BL_fit(&hChtemp.at(i), BL_output, 0.0, 75.0);
+        BL_fit(&hChtemp.at(i), BL_output, 0.0, 30.0);
+        BL_lower[i] = BL_output[0];
+        BL_RMS_lower[i] = BL_output[1];
+        BL_Chi2_lower[i] = BL_output[2];
+        BL_pValue_lower[i] = BL_output[3];
+        // BL_fit(&hChtemp.at(i), BL_output, 220.0, 320.0);
 
-      BL_fit(&hChtemp.at(i), BL_output, 290.0, 320.0);
-      BL_upper[i] = BL_output[0];
-      BL_RMS_upper[i] = BL_output[1];
-      BL_Chi2_upper[i] = BL_output[2];
-      BL_pValue_upper[i] = BL_output[3];
+        BL_fit(&hChtemp.at(i), BL_output, 290.0, 320.0);
+        BL_upper[i] = BL_output[0];
+        BL_RMS_upper[i] = BL_output[1];
+        BL_Chi2_upper[i] = BL_output[2];
+        BL_pValue_upper[i] = BL_output[3];
 
-      // determine "best" baseline
-      if (BL_Chi2_upper[i] <= BL_Chi2_lower[i])
-      {
-        BL_used[i] = BL_upper[i];
-        BL_Chi2_used[i] = BL_Chi2_upper[i];
-        BL_pValue_used[i] = BL_pValue_upper[i];
-      }
-      else
-      {
-        BL_used[i] = BL_lower[i];
-        BL_Chi2_used[i] = BL_Chi2_lower[i];
-        BL_pValue_used[i] = BL_pValue_lower[i];
-      }
-
-      if (i == skipInChannel && allowBaselineEventSkipping)
-      {
-        if (BL_Chi2_used[i] > 1)
+        // determine "best" baseline
+        if (BL_Chi2_upper[i] <= BL_Chi2_lower[i])
         {
-          skipThisEvent = true;
+          BL_used[i] = BL_upper[i];
+          BL_Chi2_used[i] = BL_Chi2_upper[i];
+          BL_pValue_used[i] = BL_pValue_upper[i];
         }
         else
         {
-         // skipThisEvent = false;
+          BL_used[i] = BL_lower[i];
+          BL_Chi2_used[i] = BL_Chi2_lower[i];
+          BL_pValue_used[i] = BL_pValue_lower[i];
         }
-      }
 
-      // SWITCH dynamic <-> constant baseline
-      float BL_shift;
-      if (switch_BL)
-      {
-        BL_shift = BL_used[i];
-      }
-      else
-      {
-        BL_shift = BL_const[i];
-      }
-      if (!enableBaselineCorrection)
-        BL_shift = 0;
+        if (i == skipInChannel && allowBaselineEventSkipping)
+        {
+          if (BL_Chi2_used[i] > 1)
+          {
+            skipThisEvent = true;
+          }
+          else
+          {
+            // skipThisEvent = false;
+          }
+        }
 
-      /***
+        // SWITCH dynamic <-> constant baseline
+        float BL_shift;
+        if (switch_BL)
+        {
+          BL_shift = BL_used[i];
+        }
+        else
+        {
+          BL_shift = BL_const[i];
+        }
+        if (!enableBaselineCorrection)
+          BL_shift = 0;
+
+        /***
  *    ___                 __      __     __         __  
  *     |  |  |\/| | |\ | / _`    /__` | |__)  |\/| /__` 
  *     |  |  |  | | | \| \__>    .__/ | |     |  | .__/ 
  *                                                      
  */
 
-      if (i == triggerChannel)
-      {                                //trigger
-        t[i] = CFDNegative(&hCh, 0.5); //Negative Trigger
-      }
-      else
-      { //SiPMs
-        t[i] = CFDInRange(&hCh, 0.35, integralStart, integralEnd);
-
-        if (t[i] < 95)
-        {
-          t[i] = CFDinvertInRange(&hCh, 0.35, integralStart, integralEnd);
+        if (i == triggerChannel)
+        {                                //trigger
+          t[i] = CFDNegative(&hCh, 0.5); //Negative Trigger
         }
-      }
+        else
+        { //SiPMs
+          t[i] = CFDInRange(&hCh, 0.35, integralStart, integralEnd);
 
-      /***
+          if (t[i] < 95)
+          {
+            t[i] = CFDinvertInRange(&hCh, 0.35, integralStart, integralEnd);
+          }
+        }
+
+        /***
  *           ___  ___  __   __               |                __         ___       __   ___ 
  *    | |\ |  |  |__  / _` |__)  /\  |       |     /\   |\/| |__) |    |  |  |  | |  \ |__  
  *    | | \|  |  |___ \__> |  \ /~~\ |___    |    /~~\  |  | |    |___ |  |  \__/ |__/ |___ 
  *                                           |                                              
  */
 
-      float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
-      int integrationLeftOffset = 20;
-      if (runName.find("calib") != std::string::npos)
-      {
-        //correctionValues[i] = 1;      //exclude for calib runs
-      //  correctionValueErrors[i] = 0; //exclude for calib runs
-        integrationLeftOffset = 10;
-      }
-      bool dynamicDCWindow=true; //DO NOT CHANGE, Unless you know what you do
-      if (isDC)
-      {
-       if(!dynamicDCWindow) t_amp = 120;
-        correctionValues[i] = 1;      //exclude for calib runs
-        correctionValueErrors[i] = 0; //exclude for calib runs
-      }
-
-      float integralStartShifted = t_amp - integrationLeftOffset;
-      float integralEndShifted = t_amp + integrationWindowsPeakSignal[i];
-      float integralEndShiftedAll = t_amp + integrationWindowsEntireSignal[i];
-
-      int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
-      if (shiftedIndex == 32)
-        shiftedIndex = 31;
-
-      Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift);
-
-      float calibrationError = calibrationChargeErrors[shiftedIndex];
-      float correctionValueError = correctionValueErrors[shiftedIndex];
-
-      float effectivFactor = correctionValues[shiftedIndex] / calibrationCharges.at(shiftedIndex);
-      float effectivFactorError = sqrt(pow((correctionValueError / calibrationCharges.at(shiftedIndex)), 2) + pow((correctionValues[shiftedIndex] * calibrationError / pow(calibrationCharges.at(shiftedIndex), 2)), 2));
-
-      Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * effectivFactor;
-      IntegralErrorP[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor + effectivFactorError);
-      IntegralErrorM[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor - effectivFactorError);
-
-      IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
-
-     
-     if(i<9){
-      if(IntegralDiff[i]>1 || Integral[i]>595 ){
-      //  if(!skipThisEvent)forcePrintThisEvent=true;
-      }
-     }
-
-
-
-
-
-      if (allowVetoSkipping && i == vetoChannel)
-      {
-        float ampForVeto = AmplitudeHist(&hCh, 0, 300, 0); //Search Everywhere
-        if (ampForVeto > vetoThreshold)
+        float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
+        int integrationLeftOffset = 20;
+        if (runName.find("calib") != std::string::npos)
         {
-          skipThisEvent = true;
-          //forcePrintEvent=true;
+          //correctionValues[i] = 1;      //exclude for calib runs
+          //  correctionValueErrors[i] = 0; //exclude for calib runs
+          integrationLeftOffset = 10;
         }
-      }
+        bool dynamicDCWindow = true; //DO NOT CHANGE, Unless you know what you do
+        if (isDC)
+        {
+          if (!dynamicDCWindow)
+            t_amp = 120;
+          correctionValues[i] = 1;      //exclude for calib runs
+          correctionValueErrors[i] = 0; //exclude for calib runs
+        }
 
-      if (WOMID[i] >= 0)
-        histChannelSumWOM[WOMID[i]]->Add(&hCh);
+        float integralStartShifted = t_amp - integrationLeftOffset;
+        float integralEndShifted = t_amp + integrationWindowsPeakSignal[i];
+        float integralEndShiftedAll = t_amp + integrationWindowsEntireSignal[i];
 
-      /***
+        int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
+        if (shiftedIndex == 32)
+          shiftedIndex = 31;
+
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift);
+
+        float calibrationError = calibrationChargeErrors[shiftedIndex];
+        float correctionValueError = correctionValueErrors[shiftedIndex];
+
+        float effectivFactor = correctionValues[shiftedIndex] / calibrationCharges.at(shiftedIndex);
+        float effectivFactorError = sqrt(pow((correctionValueError / calibrationCharges.at(shiftedIndex)), 2) + pow((correctionValues[shiftedIndex] * calibrationError / pow(calibrationCharges.at(shiftedIndex), 2)), 2));
+
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * effectivFactor;
+        IntegralErrorP[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor + effectivFactorError);
+        IntegralErrorM[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor - effectivFactorError);
+
+        IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
+
+        if (i ==14 || i==15)
+        {
+          float pe = hCh.GetMinimum();
+        if (pe < -5)
+          {
+            forcePrintThisEvent = true;
+            cout<<"MINI: "<<pe<<" E: "<<EventNumber<<endl;
+          }
+
+
+        }
+
+        float ampForVeto = 0.0;
+        if (allowVetoSkipping && i == vetoChannel)
+        {
+          ampForVeto = AmplitudeHistAlternative(&hCh, 0, 320, 0); //Search Everywhere
+          if (ampForVeto > vetoThreshold)
+          {
+            skipThisEvent = true;
+            //forcePrintEvent=true;
+          }
+        }
+
+        if (WOMID[i] >= 0)
+          histChannelSumWOM[WOMID[i]]->Add(&hCh);
+
+        /***
  *     __   __         ___         __                     ___  __  
  *    |__) |__) | |\ |  |  | |\ | / _`    |  |  /\  \  / |__  /__` 
  *    |    |  \ | | \|  |  | | \| \__>    |/\| /~~\  \/  |___ .__/ 
  *                                                                 
  */
 
-      if (print)
-      {
-      //  if(!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents)))){
-        if ((forcePrintThisEvent && (forcePrintEvents<maximalForcePrintEvents)) || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+        if (print)
         {
+          //  if(!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents)))){
+        //  if ((forcePrintThisEvent && (forcePrintEvents < maximalForcePrintEvents)) || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+          
+         
+          
+           if ( allowForcePrintEvents || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+          {
 
-          cWaves.cd(i + 1);
-          if (zoomedInWaves)
-            hCh.GetXaxis()->SetRange((integralStartShifted - 50) / SP, (integralEndShiftedAll + 50) / SP);
+            cWaves.cd(i + 1);
+            if (zoomedInWaves)
+              hCh.GetXaxis()->SetRange((integralStartShifted - 50) / SP, (integralEndShiftedAll + 50) / SP);
 
-          hCh.DrawCopy("HIST"); //No error bars pls
-          hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
-          int max_bin = hCh.GetMaximumBin();
-          int lower_bin = max_bin - 20.0 / SP;
-          int upper_bin = max_bin + 30.0 / SP;
-          // double x = h->GetXaxis()->GetBinCenter(binmax);
-          float max_time = hCh.GetXaxis()->GetBinCenter(max_bin);
-          float lower_time = hCh.GetXaxis()->GetBinCenter(lower_bin);
-          float upper_time = hCh.GetXaxis()->GetBinCenter(upper_bin);
-          hCh.GetXaxis()->SetRange(0, 1024);
-          TLine *ln4 = new TLine(0, BL_lower[i], 75, BL_lower[i]);
-          TLine *ln5 = new TLine(270, BL_upper[i], 320, BL_upper[i]);
-          TText *text = new TText(.5, .5, Form("%f %f", BL_lower[i], BL_upper[i]));
-          ln4->SetLineColor(2);
-          ln5->SetLineColor(2);
+            hCh.DrawCopy("HIST"); //No error bars pls
+            hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
+            int max_bin = hCh.GetMaximumBin();
+            int lower_bin = max_bin - 20.0 / SP;
+            int upper_bin = max_bin + 30.0 / SP;
+            // double x = h->GetXaxis()->GetBinCenter(binmax);
+            float max_time = hCh.GetXaxis()->GetBinCenter(max_bin);
+            float lower_time = hCh.GetXaxis()->GetBinCenter(lower_bin);
+            float upper_time = hCh.GetXaxis()->GetBinCenter(upper_bin);
+            hCh.GetXaxis()->SetRange(0, 1024);
+            TLine *ln4 = new TLine(0, BL_lower[i], 75, BL_lower[i]);
+            TLine *ln5 = new TLine(270, BL_upper[i], 320, BL_upper[i]);
+            TText *text = new TText(.5, .5, Form("%f %f", BL_lower[i], BL_upper[i]));
+            ln4->SetLineColor(2);
+            ln5->SetLineColor(2);
 
-          TLine *baselineUsed = new TLine(0, BL_shift, 320, BL_shift);
-          baselineUsed->SetLineColor(3);
-          baselineUsed->SetLineWidth(2);
+            TLine *baselineUsed = new TLine(0, BL_shift, 320, BL_shift);
+            baselineUsed->SetLineColor(3);
+            baselineUsed->SetLineWidth(2);
 
-          float minY = hCh.GetMinimum();
-          float maxY = hCh.GetMaximum();
-          TLine *leftInterval;
-          TLine *rightInterval;
-          TLine *endInterval;
+            float minY = hCh.GetMinimum();
+            float maxY = hCh.GetMaximum();
+            TLine *leftInterval;
+            TLine *rightInterval;
+            TLine *endInterval;
 
-          leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
-          rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
-          endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
+            leftInterval = new TLine(integralStartShifted, minY, integralStartShifted, maxY);
+            rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
+            endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
 
-          leftInterval->SetLineColor(2);
-          rightInterval->SetLineColor(2);
+            leftInterval->SetLineColor(2);
+            rightInterval->SetLineColor(2);
 
-          baselineUsed->Draw("same");
-          ln4->Draw("same");
-          ln5->Draw("same");
+            baselineUsed->Draw("same");
+            ln4->Draw("same");
+            ln5->Draw("same");
 
-          leftInterval->Draw("same");
-          rightInterval->Draw("same");
-          endInterval->Draw("same");
+            leftInterval->Draw("same");
+            rightInterval->Draw("same");
+            endInterval->Draw("same");
+            TLegend *h_leg = new TLegend(0.62, 0.67, 1, 1);
 
-          TLegend *h_leg = new TLegend(0.62, 0.67, 1, 1);
-          h_leg->SetTextSize(0.015);
-          if (allowForcePrintEvents)
-            h_leg->AddEntry((TObject *)0, Form("ForcePrinted: %d, Count: %d, Skip: %d", forcePrintThisEvent, forcePrintEvents, skipThisEvent), "");
-          h_leg->AddEntry((TObject *)0, Form("Integral: %1.2f /ErrP(%1.2f)/ErrM(%1.2f)", Integral[i], IntegralErrorP[i], IntegralErrorM[i]), "");
-          h_leg->AddEntry((TObject *)0, Form("Amplitude: %1.2f", Amplitude[i]), "");
-          h_leg->AddEntry((TObject *)0, Form("Calibration Value: %1.2f +- %1.2f", calibrationCharges.at(shiftedIndex), calibrationChargeErrors.at(shiftedIndex)), "");
-          h_leg->AddEntry((TObject *)0, Form("CF: %1.2f +- %1.2f", correctionValues[i], correctionValueErrors[i]), "");
-          h_leg->AddEntry((TObject *)0, Form("BL: %1.2f", BL_shift), "");
-          h_leg->AddEntry((TObject *)0, Form("Percentage: %1.2f", IntegralDiff[i]), "");
-          h_leg->AddEntry((TObject *)0, Form("Eff. Factor (%1.4f): %1.4f+-%1.4f", correctionValues[shiftedIndex] / calibrationCharges.at(shiftedIndex), effectivFactor, effectivFactorError), "");
+            bool lightMode = false;
+            if (allowVetoSkipping && i == vetoChannel)
+            {
+              lightMode = true;
+              h_leg->AddEntry((TObject *)0, Form("Amplitude VETO: %1.2f", ampForVeto), "");
+               float sumD = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
+              h_leg->AddEntry((TObject *)0, Form("SumIntD: %1.2f", sumD), "");
 
-          h_leg->AddEntry((TObject *)0, Form("Window: Left: %d, Right %1.2f, %1.2f", integrationLeftOffset, integrationWindowsPeakSignal[i], integrationWindowsEntireSignal[i]), "");
-          h_leg->AddEntry((TObject *)0, Form("PWindowSize: %1.2f", abs(integralStartShifted - integralEndShifted)), "");
+            }
 
-          float sumD = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
-          h_leg->AddEntry((TObject *)0, Form("SumIntD: %1.2f", sumD), "");
+            h_leg->SetTextSize(0.015);
+            if (allowForcePrintEvents)
+              h_leg->AddEntry((TObject *)0, Form("ForcePrinted: %d, Count: %d, Skip: %d", forcePrintThisEvent, forcePrintEvents, skipThisEvent), "");
+            h_leg->AddEntry((TObject *)0, Form("Integral: %1.2f /ErrP(%1.2f)/ErrM(%1.2f)", Integral[i], IntegralErrorP[i], IntegralErrorM[i]), "");
+            h_leg->AddEntry((TObject *)0, Form("Amplitude: %1.2f", Amplitude[i]), "");
+            if (!lightMode)
+            {
+              h_leg->AddEntry((TObject *)0, Form("Calibration Value: %1.2f +- %1.2f", calibrationCharges.at(shiftedIndex), calibrationChargeErrors.at(shiftedIndex)), "");
+              h_leg->AddEntry((TObject *)0, Form("CF: %1.2f +- %1.2f", correctionValues[i], correctionValueErrors[i]), "");
+              h_leg->AddEntry((TObject *)0, Form("BL: %1.2f", BL_shift), "");
+              h_leg->AddEntry((TObject *)0, Form("Percentage: %1.2f", IntegralDiff[i]), "");
+              h_leg->AddEntry((TObject *)0, Form("Eff. Factor (%1.4f): %1.4f+-%1.4f", correctionValues[shiftedIndex] / calibrationCharges.at(shiftedIndex), effectivFactor, effectivFactorError), "");
+              h_leg->AddEntry((TObject *)0, Form("Window: Left: %d, Right %1.2f, %1.2f", integrationLeftOffset, integrationWindowsPeakSignal[i], integrationWindowsEntireSignal[i]), "");
+              h_leg->AddEntry((TObject *)0, Form("PWindowSize: %1.2f", abs(integralStartShifted - integralEndShifted)), "");
+            }
+           
+            h_leg->Draw();
 
-          h_leg->Draw();
-
-          text->Draw("same");
+            text->Draw("same");
+          }
+          hCh.GetXaxis()->SetRange(1, 30 / SP);
+          noiseLevel[i] = hCh.GetMaximum() - hCh.GetMinimum();
+          hCh.GetXaxis()->SetRange(1, 1024);
+          // End of loop over inividual channels
         }
-        hCh.GetXaxis()->SetRange(1, 30 / SP);
-        noiseLevel[i] = hCh.GetMaximum() - hCh.GetMinimum();
-        hCh.GetXaxis()->SetRange(1, 1024);
-        // End of loop over inividual channels
+
+        if (!skipThisEvent && print)
+        {
+          TF1 *f_const = new TF1("f_const", "pol0", 0, 320);
+          f_const->SetParameter(0, BL_shift);
+          hCh.Add(f_const, -1);
+          hChSum.at(i)->Add(&hCh, 1);
+        }
       }
 
-      if (!skipThisEvent && print)
-      {
-        TF1 *f_const = new TF1("f_const", "pol0", 0, 320);
-        f_const->SetParameter(0, BL_shift);
-        hCh.Add(f_const, -1);
-        hChSum.at(i)->Add(&hCh, 1);
-      }
-    }
-
-    /***
+      /***
  *          __            __              __  
  *    |  | /  \  |\/|    /__` |  |  |\/| /__` 
  *    |/\| \__/  |  |    .__/ \__/  |  | .__/ 
  *                                            
  */
 
-    for (int i = 0; i < 4; i++)
-    {
-      womCanvas.cd(i + 1);
-      histChannelSumWOM[i]->DrawCopy();
+   
 
-      if (i == 3)
+      for (int i = 0; i < 4; i++)
       {
-        //WOM D
-        IntegralSum[i] = Integral[0] + Integral[1] + Integral[2] + Integral[3] + Integral[4] + Integral[5] + Integral[6] + Integral[7];
-        IntegralSumErrorP[i] = IntegralErrorP[0] + IntegralErrorP[1] + IntegralErrorP[2] + IntegralErrorP[3] + IntegralErrorP[4] + IntegralErrorP[5] + IntegralErrorP[6] + IntegralErrorP[7];
-        IntegralSumErrorM[i] = IntegralErrorM[0] + IntegralErrorM[1] + IntegralErrorM[2] + IntegralErrorM[3] + IntegralErrorM[4] + IntegralErrorM[5] + IntegralErrorM[6] + IntegralErrorM[7];
+        womCanvas.cd(i + 1);
+        histChannelSumWOM[i]->DrawCopy();
 
-        AmplitudeSum[i] = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
-
-        if (IntegralSum[3] < 10)
+        if (i == 3)
         {
-         //fore if(allowForcePrintEvents)
-        //  forcePrintThisEvent = true;
+          //WOM D
+          IntegralSum[i] = Integral[0] + Integral[1] + Integral[2] + Integral[3] + Integral[4] + Integral[5] + Integral[6] + Integral[7];
+          IntegralSumErrorP[i] = IntegralErrorP[0] + IntegralErrorP[1] + IntegralErrorP[2] + IntegralErrorP[3] + IntegralErrorP[4] + IntegralErrorP[5] + IntegralErrorP[6] + IntegralErrorP[7];
+          IntegralSumErrorM[i] = IntegralErrorM[0] + IntegralErrorM[1] + IntegralErrorM[2] + IntegralErrorM[3] + IntegralErrorM[4] + IntegralErrorM[5] + IntegralErrorM[6] + IntegralErrorM[7];
+
+          AmplitudeSum[i] = Amplitude[0] + Amplitude[1] + Amplitude[2] + Amplitude[3] + Amplitude[4] + Amplitude[5] + Amplitude[6] + Amplitude[7];
+
+          if (IntegralSum[3] < 6)
+          {
+            //fore if(allowForcePrintEvents)
+          //  forcePrintThisEvent = true;
+          }
         }
+        else if (i == 2)
+        {
+          //WOM C
+          IntegralSum[i] = Integral[8] + Integral[9] + Integral[10] + Integral[11] + Integral[12] + Integral[13] + Integral[14] + Integral[15];
+          IntegralSumErrorP[i] = IntegralErrorP[8] + IntegralErrorP[9] + IntegralErrorP[10] + IntegralErrorP[11] + IntegralErrorP[12] + IntegralErrorP[13] + IntegralErrorP[14] + IntegralErrorP[15];
+          IntegralSumErrorM[i] = IntegralErrorM[8] + IntegralErrorM[9] + IntegralErrorM[10] + IntegralErrorM[11] + IntegralErrorM[12] + IntegralErrorM[13] + IntegralErrorM[14] + IntegralErrorM[15];
+
+          AmplitudeSum[i] = Amplitude[8] + Amplitude[9] + Amplitude[10] + Amplitude[11] + Amplitude[12] + Amplitude[13] + Amplitude[14] + Amplitude[15];
+        }
+        else if (i == 1)
+        {
+          //WOM B
+          IntegralSum[i] = (8.0 / 7.0) * (Integral[24] + Integral[25] + Integral[26] + Integral[27] + Integral[28] + Integral[29] + Integral[30]);                                                 //1 Missing -> Trigger
+          IntegralSumErrorP[i] = (8.0 / 7.0) * (IntegralErrorP[24] + IntegralErrorP[25] + IntegralErrorP[26] + IntegralErrorP[27] + IntegralErrorP[28] + IntegralErrorP[29] + IntegralErrorP[30]); //1 Missing -> Trigger
+          IntegralSumErrorM[i] = (8.0 / 7.0) * (IntegralErrorM[24] + IntegralErrorM[25] + IntegralErrorM[26] + IntegralErrorM[27] + IntegralErrorM[28] + IntegralErrorM[29] + IntegralErrorM[30]); //1 Missing -> Trigger
+
+          AmplitudeSum[i] = (8.0 / 7.0) * (Amplitude[24] + Amplitude[25] + Amplitude[26] + Amplitude[27] + Amplitude[28] + Amplitude[29] + Amplitude[30]); //1 Missing -> Trigger
+        }
+        else if (i == 0)
+        {
+          //WOM A
+          IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
+          IntegralSumErrorP[i] = IntegralErrorP[16] + IntegralErrorP[17] + IntegralErrorP[18] + IntegralErrorP[19] + IntegralErrorP[20] + IntegralErrorP[21] + IntegralErrorP[22] + IntegralErrorP[23];
+          IntegralSumErrorM[i] = IntegralErrorM[16] + IntegralErrorM[17] + IntegralErrorM[18] + IntegralErrorM[19] + IntegralErrorM[20] + IntegralErrorM[21] + IntegralErrorM[22] + IntegralErrorM[23];
+
+          AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
+        }
+
+        chargeChannelSumWOM[i] = IntegralSum[i];
+        chargeChannelSumWOMErrorP[i] = IntegralSumErrorP[i];
+        chargeChannelSumWOMErrorM[i] = IntegralSumErrorM[i];
+
+        amplitudeChannelSumWOM[i] = AmplitudeSum[i];
       }
-      else if (i == 2)
+
+      if (forcePrintThisEvent)
       {
-        //WOM C
-        IntegralSum[i] = Integral[8] + Integral[9] + Integral[10] + Integral[11] + Integral[12] + Integral[13] + Integral[14] + Integral[15];
-        IntegralSumErrorP[i] = IntegralErrorP[8] + IntegralErrorP[9] + IntegralErrorP[10] + IntegralErrorP[11] + IntegralErrorP[12] + IntegralErrorP[13] + IntegralErrorP[14] + IntegralErrorP[15];
-        IntegralSumErrorM[i] = IntegralErrorM[8] + IntegralErrorM[9] + IntegralErrorM[10] + IntegralErrorM[11] + IntegralErrorM[12] + IntegralErrorM[13] + IntegralErrorM[14] + IntegralErrorM[15];
-
-        AmplitudeSum[i] = Amplitude[8] + Amplitude[9] + Amplitude[10] + Amplitude[11] + Amplitude[12] + Amplitude[13] + Amplitude[14] + Amplitude[15];
-      }
-      else if (i == 1)
-      {
-        //WOM B
-        IntegralSum[i] = (8.0 / 7.0) * (Integral[24] + Integral[25] + Integral[26] + Integral[27] + Integral[28] + Integral[29] + Integral[30]);                                                 //1 Missing -> Trigger
-        IntegralSumErrorP[i] = (8.0 / 7.0) * (IntegralErrorP[24] + IntegralErrorP[25] + IntegralErrorP[26] + IntegralErrorP[27] + IntegralErrorP[28] + IntegralErrorP[29] + IntegralErrorP[30]); //1 Missing -> Trigger
-        IntegralSumErrorM[i] = (8.0 / 7.0) * (IntegralErrorM[24] + IntegralErrorM[25] + IntegralErrorM[26] + IntegralErrorM[27] + IntegralErrorM[28] + IntegralErrorM[29] + IntegralErrorM[30]); //1 Missing -> Trigger
-
-        AmplitudeSum[i] = (8.0 / 7.0) * (Amplitude[24] + Amplitude[25] + Amplitude[26] + Amplitude[27] + Amplitude[28] + Amplitude[29] + Amplitude[30]); //1 Missing -> Trigger
-      }
-      else if (i == 0)
-      {
-        //WOM A
-        IntegralSum[i] = Integral[16] + Integral[17] + Integral[18] + Integral[19] + Integral[20] + Integral[21] + Integral[22] + Integral[23];
-        IntegralSumErrorP[i] = IntegralErrorP[16] + IntegralErrorP[17] + IntegralErrorP[18] + IntegralErrorP[19] + IntegralErrorP[20] + IntegralErrorP[21] + IntegralErrorP[22] + IntegralErrorP[23];
-        IntegralSumErrorM[i] = IntegralErrorM[16] + IntegralErrorM[17] + IntegralErrorM[18] + IntegralErrorM[19] + IntegralErrorM[20] + IntegralErrorM[21] + IntegralErrorM[22] + IntegralErrorM[23];
-
-        AmplitudeSum[i] = Amplitude[16] + Amplitude[17] + Amplitude[18] + Amplitude[19] + Amplitude[20] + Amplitude[21] + Amplitude[22] + Amplitude[23];
+        forcePrintEvents++;
       }
 
-      chargeChannelSumWOM[i] = IntegralSum[i];
-      chargeChannelSumWOMErrorP[i] = IntegralSumErrorP[i];
-      chargeChannelSumWOMErrorM[i] = IntegralSumErrorM[i];
-
-      amplitudeChannelSumWOM[i] = AmplitudeSum[i];
-    }
-
-    if (forcePrintThisEvent)
-    {
-      forcePrintEvents++;
-    }
-
-    /***
+      /***
  *    ___                 __     ___  __     __   __   ___  __  
  *     |  |  |\/| | |\ | / _`     |  |__) | / _` / _` |__  |__) 
  *     |  |  |  | | | \| \__>     |  |  \ | \__> \__> |___ |  \ 
  *                                                              
  */
 
-    trigT = t[triggerChannel];
-    for (int i = 0; i < runChannelNumberWC; i++)
-    {
-      if (i != triggerChannel)
-        tSiPM[i] = t[i] - trigT;
-    }
+      trigT = t[triggerChannel];
+      for (int i = 0; i < runChannelNumberWC; i++)
+      {
+        if (i != triggerChannel)
+          tSiPM[i] = t[i] - trigT;
+      }
 
-    /***
+      /***
  *     __       ___  __       ___ 
  *    /  \ |  |  |  |__) |  |  |  
  *    \__/ \__/  |  |    \__/  |  
  *                                
  */
 
-    if (print)
-    {
-
-      if(!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents)))){
-      if ((forcePrintThisEvent && (forcePrintEvents<maximalForcePrintEvents))  || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+      if (print)
       {
-        if (printExtraEvents)
-          printedExtraEvents++;
-        currentPrint = fileCounter;
 
-        if (fileCounter == 0 && ((fileCounter != (numberOfBinaryFiles - 1)) || forcePrintThisEvent))
+        if (!skipThisEvent || (skipThisEvent && (forcePrintThisEvent || (printedExtraEvents < maximalExtraPrintEvents))))
         {
-          cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
-          womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf("), "pdf");
-        }
-        else
-        {
+          if ((forcePrintThisEvent && (forcePrintEvents < maximalForcePrintEvents)) || ((currentPrint != fileCounter) || (printedExtraEvents < maximalExtraPrintEvents)))
+          {
+            if (printExtraEvents)
+              printedExtraEvents++;
+            currentPrint = fileCounter;
 
-          cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
-          womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf"), "pdf");
+            if (fileCounter == 0 && ((fileCounter != (numberOfBinaryFiles - 1)) || forcePrintThisEvent))
+            {
+              cWaves.Print((TString)(plotSaveFolder + "/waves.pdf("), "pdf");
+              womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf("), "pdf");
+            }
+            else
+            {
+
+              cWaves.Print((TString)(plotSaveFolder + "/waves.pdf"), "pdf");
+              womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf"), "pdf");
+            }
+          }
         }
       }
-    }}
 
-    /*Writing the data for that event to the tree.*/
-    if (!skipThisEvent)
-    {
-      tree->Fill();
+      /*Writing the data for that event to the tree.*/
+      if (!skipThisEvent)
+      {
+        tree->Fill();
+      }
+      else
+      {
+        skippedCount = skippedCount + 1;
+      }
     }
-    else
+    auto nevent = tree->GetEntries();
+
+    cout << "Events in Tree:  " << nevent << " Skipped:  " << skippedCount << endl;
+    fclose(pFILE);
+    fileCounter++;
+  }
+
+  if (print)
+  {
+    /*Clearing objects and saving files.*/
+    inList.close();
+
+    if (numberOfBinaryFiles != 1 || forcePrintEvents > 0)
     {
-      skippedCount = skippedCount + 1;
+      cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
+      womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf)"), "pdf");
     }
+    cWaves.Clear();
+    womCanvas.Clear();
+    for (int i = 0; i < runChannelNumberWC; i++)
+    {
+      cChSum.cd(i + 1);
+      hChSum.at(i)->Draw("HIST");
+    }
+    cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
   }
-  auto nevent = tree->GetEntries();
 
-  cout << "Events in Tree:  " << nevent << " Skipped:  " << skippedCount << endl;
-  fclose(pFILE);
-  fileCounter++;
-}
+  gErrorIgnoreLevel = kWarning;
 
-if (print)
-{
-  /*Clearing objects and saving files.*/
-  inList.close();
+  rootFile = tree->GetCurrentFile();
 
-  if (numberOfBinaryFiles != 1 || forcePrintEvents > 0)
-  {
-    cWaves.Print((TString)(plotSaveFolder + "/waves.pdf)"), "pdf");
-    womCanvas.Print((TString)(plotSaveFolder + "/womSum.pdf)"), "pdf");
-  }
-  cWaves.Clear();
-  womCanvas.Clear();
-  for (int i = 0; i < runChannelNumberWC; i++)
-  {
-    cChSum.cd(i + 1);
-    hChSum.at(i)->Draw("HIST");
-  }
-  cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
-}
+  //int skipcount= &skippedCount;
+  //gDirectory->WriteObject(skipcount,"skippedCount");
 
-gErrorIgnoreLevel = kWarning;
-
-rootFile = tree->GetCurrentFile();
-
-//int skipcount= &skippedCount;
-//gDirectory->WriteObject(skipcount,"skippedCount");
-
-rootFile->Write();
-rootFile->Close();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  rootFile->Write();
+  rootFile->Close();
 }

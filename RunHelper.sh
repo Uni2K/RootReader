@@ -517,8 +517,9 @@ startAutomaticEffRun() {
                     ;;
                 esac
             done
-            echo "Select DC Run:"
-            read runNumberDC
+              unset runNumber
+             echo "Select DC Run:"
+             read runNumber
 
             echo "Location of the Integration Scripts $iwScriptDir"
             echo "Location of the Rootfile Folder  $rootfileFolderDir"
@@ -557,27 +558,30 @@ startAutomaticEffRun() {
             dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
 
             rootfileFolderDir=$analysisPath/rootfiles
+            savedRunNumber=("${runNumber[@]}")  
 
-            for wRun in "${runNumber[@]}"; do
+            for wRun in "${savedRunNumber[@]}"; do
                 #find runname
                 aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
                 echo "Using $aRunName"
                 iWForceRun=$aRunName
+
                 automaticWindow=false
                 #start DC reading with IW from aRunName
                 start
                 echo "Moving files..."
 
                 suffix="iw$wRun"
-                path=$(find . -type f -name "${runNumberDC}_dc*" -a -name '*.root')
+                path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root')
                 echo "path: $path"
-                if cp $path "$rootfileFolderDir/${runNumberDC}_dc_${suffix}.root"; then
+                if cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"; then
                     echo Moving successfull!
                 else
                     exit 222
                 fi
 
             done
+            runNumber=("${savedUunNumber[@]}")  
 
             break
             ;;
@@ -594,29 +598,33 @@ startAutomaticDCRun() {
     rootfileFolderDir=$analysisPath/rootfiles
 
     echo "Using runs: ${runNumber[*]}"
+    savedRunNumber=("${runNumber[@]}")  
+    unset runNumber
     echo "Select DC Run:"
-    read runNumberDC
-
-    for wRun in "${runNumber[@]}"; do
+    read runNumber
+                   
+    for wRun in "${savedRunNumber[@]}"; do
         #find runname
         aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
         echo "Using $aRunName"
         iWForceRun=$aRunName
         automaticWindow=false
         #start DC reading with IW from aRunName
+        echo "DEBUG: $runNumber    ${savedRunNumber[*]}"
         start
         echo "Moving files..."
 
         suffix="iw$wRun"
-        path=$(find . -type f -name "${runNumberDC}_dc*" -a -name '*.root')
+        path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root')
         echo "path: $path"
-        if cp $path "$rootfileFolderDir/${runNumberDC}_dc_${suffix}.root"; then
+        if cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"; then
             echo Moving successfull!
         else
             exit 222
         fi
 
     done
+    runNumber=("${savedUunNumber[@]}")  
 
     #python $dcScriptDir/DCProbability.py
 
