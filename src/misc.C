@@ -68,7 +68,8 @@ vector<float> readVector(string calib_path, string _runName, double initValue)
 
   while (std::getline(infile, line))
   {
-    if ((line.find(_runName) != std::string::npos) || (line.find("all") != std::string::npos))
+   // if ((line.find(_runName) != std::string::npos) || (line.find("all") != std::string::npos))
+    if ((line.find(_runName) != std::string::npos))
     {
 
       calib_amp.clear();
@@ -114,7 +115,8 @@ pair<vector<float>,vector<float>> readPair(string path, string _runName, double 
 
   while (std::getline(infile, line))
   {
-    if ((line.find(_runName) != std::string::npos) || (line.find("all") != std::string::npos))
+  //  if ((line.find(_runName) != std::string::npos) || (line.find("all") != std::string::npos)) Dangerous, if all is included in names
+    if ((line.find(_runName) != std::string::npos) )
     {
 
       peakSignals.clear();

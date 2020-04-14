@@ -124,9 +124,9 @@ bool zoomedInWaves = false; //Zoom in the waves.pdf on the signal range
 
 bool enableBaselineCorrection = true;
 //Allow Force Printing individual events
-bool allowForcePrintEvents = true;
+bool allowForcePrintEvents = false;
 bool forcePrintThisEvent = false;
-int maximalForcePrintEvents = 20;
+int maximalForcePrintEvents = 2;
 int forcePrintEvents = 0;
 
 struct rusage r_usage;
@@ -858,18 +858,20 @@ void read(map<string, string> readParameters)
         IntegralErrorM[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor - effectivFactorError);
 
         IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
-
-        if (i ==14 || i==15)
+      
+      
+       /* if (i ==14 || i==15)
         {
           float pe = hCh.GetMinimum();
-        if (pe < -5)
+        if (pe < -4)
           {
             forcePrintThisEvent = true;
-            cout<<"MINI: "<<pe<<" E: "<<EventNumber<<endl;
+
+          }else{
+            skipThisEvent=true;
+
           }
-
-
-        }
+        }*/
 
         float ampForVeto = 0.0;
         if (allowVetoSkipping && i == vetoChannel)
@@ -1057,6 +1059,10 @@ void read(map<string, string> readParameters)
         amplitudeChannelSumWOM[i] = AmplitudeSum[i];
       }
 
+      if(skipThisEvent){
+         forcePrintThisEvent = false;
+      }
+    
       if (forcePrintThisEvent)
       {
         forcePrintEvents++;
@@ -1082,6 +1088,9 @@ void read(map<string, string> readParameters)
  *    \__/ \__/  |  |    \__/  |  
  *                                
  */
+
+
+
 
       if (print)
       {

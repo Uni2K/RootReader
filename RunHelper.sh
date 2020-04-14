@@ -493,9 +493,13 @@ startAutomaticEffRun() {
 
         "Yes")
             echo "Started for runs: (${runNumber[*]}) "
-
+            echo "Select DC Run:"
+            read runNumberDC
             iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
             rootfileFolderDir=$analysisPath/rootfiles
+            echo "Location of the Integration Scripts $iwScriptDir"
+            echo "Location of the Rootfile Folder  $rootfileFolderDir"
+
 
             echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
             echo "Yes -> starts automatic Baseline File creation"
@@ -517,13 +521,9 @@ startAutomaticEffRun() {
                     ;;
                 esac
             done
-              unset runNumber
-             echo "Select DC Run:"
-             read runNumber
+           
 
-            echo "Location of the Integration Scripts $iwScriptDir"
-            echo "Location of the Rootfile Folder  $rootfileFolderDir"
-
+            
             echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
             ($iwScriptDir/IntegrationWindowAnalysis.sh)
             echo "Done Integration Window Script! "
@@ -548,7 +548,7 @@ startAutomaticEffRun() {
 
             echo "Run with Correction Factor... "
             start
-            echo "Moving files..."
+            echo "Moving IW files..."
             for n in ${runNumber[@]}; do
                 find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
             done
@@ -560,6 +560,12 @@ startAutomaticEffRun() {
             rootfileFolderDir=$analysisPath/rootfiles
             savedRunNumber=("${runNumber[@]}")  
 
+            unset runNumber
+            runNumber=("${runNumberDC[@]}")  
+ 
+
+
+
             for wRun in "${savedRunNumber[@]}"; do
                 #find runname
                 aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
@@ -569,19 +575,21 @@ startAutomaticEffRun() {
                 automaticWindow=false
                 #start DC reading with IW from aRunName
                 start
-                echo "Moving files..."
+                echo "Moving DC files..."
 
                 suffix="iw$wRun"
                 path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root')
-                echo "path: $path"
+                echo "origin path: $path, destination: $rootfileFolderDir/${runNumber}_dc_${suffix}.root"
                 if cp $path "$rootfileFolderDir/${runNumber}_dc_${suffix}.root"; then
-                    echo Moving successfull!
+                    echo "Moving successfull!"
                 else
+                    echo "Moving not successfull! :("
                     exit 222
                 fi
 
             done
-            runNumber=("${savedUunNumber[@]}")  
+            runNumber=("${savedRunNumber[@]}")  
+             echo "Done with the automatic efficiency run!"
 
             break
             ;;
