@@ -39,6 +39,7 @@
 #include "analysis.h"
 #include "misc.h"
 #include "read.h"
+#include <linux/limits.h>
 
 float SP = 0.3125; // ns per bin
 float pe = 47.46;  //mV*ns
