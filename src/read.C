@@ -279,9 +279,9 @@ void read(map<string, string> readParameters)
   float IntegralErrorM[runChannelNumberWC];
 
   float IntegralDiff[runChannelNumberWC];
-  float IntegralSum[runChannelNumberWC];       //Only Temp
-  float IntegralSumErrorP[runChannelNumberWC]; //Only Temp
-  float IntegralSumErrorM[runChannelNumberWC]; //Only Temp
+  float IntegralSum[runChannelNumberWC];       
+  float IntegralSumErrorP[runChannelNumberWC]; 
+  float IntegralSumErrorM[runChannelNumberWC]; 
 
   float Amplitude[runChannelNumberWC];
   float AmplitudeSum[runChannelNumberWC];
@@ -315,6 +315,7 @@ void read(map<string, string> readParameters)
   Float_t chargeChannelSumWOMErrorM[womCount];
 
   std::vector<TH1F *> histChannelSumWOM;
+    int binNumber=1024; //Default: 1024, change with caution
 
   if (print)
   {
@@ -323,7 +324,7 @@ void read(map<string, string> readParameters)
     {
       TString name("");
       name.Form("hChSum_%d", i);
-      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", binNumber, -0.5 * SP, 1023.5 * SP);
       h->SetName(name);
       hChSum.push_back(h);
     }
@@ -332,7 +333,7 @@ void read(map<string, string> readParameters)
     {
       TString name("");
       name.Form("hChShift_%d", i);
-      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", binNumber, -0.5 * SP, 1023.5 * SP);
       h->SetName(name);
       hChShift.push_back(h);
     }
@@ -341,7 +342,7 @@ void read(map<string, string> readParameters)
     {
       TString name("");
       name.Form("histChannelSumWOM%d", i);
-      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+      TH1F *h = new TH1F("h", ";ns;Amplitude, mV", binNumber, -0.5 * SP, 1023.5 * SP);
       h->SetName(name);
       histChannelSumWOM.push_back(h);
     }
@@ -351,7 +352,7 @@ void read(map<string, string> readParameters)
   {
     TString name("");
     name.Form("hChtemp_%d", i);
-    TH1F h("h", ";ns;Amplitude, mV", 1024, -0.5 * SP, 1023.5 * SP);
+    TH1F h("h", ";ns;Amplitude, mV", binNumber, -0.5 * SP, 1023.5 * SP);
     h.SetName(name);
     hChtemp.push_back(h);
   }
@@ -1151,7 +1152,14 @@ void read(map<string, string> readParameters)
     for (int i = 0; i < runChannelNumberWC; i++)
     {
       cChSum.cd(i + 1);
+      hChSum.at(i)->GetXaxis()->SetRange(100,250);
+      hChSum.at(i)->GetXaxis()->SetLabelSize(0.04);
+      hChSum.at(i)->GetYaxis()->SetLabelSize(0.04);
+
+       hChSum.at(i)->SetStats(0);
+
       hChSum.at(i)->Draw("HIST");
+      hChSum.at(i)->SetFillColorAlpha(4, 0.8);
     }
     cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
   }
