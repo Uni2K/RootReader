@@ -19,14 +19,15 @@ fastRunName=0
 fastLineArr=0
 
 showInformation() {
-    echo "  _____             _   _    _      _                 "
-    echo " |  __ \           | | | |  | |    | |                "
-    echo " | |__) |___   ___ | |_| |__| | ___| |_ __   ___ _ __ "
-    echo " |  _  // _ \ / _ \| __|  __  |/ _ \ | '_ \ / _ \ '__|"
-    echo " | | \ \ (_) | (_) | |_| |  | |  __/ | |_) |  __/ |   "
-    echo " |_|  \_\___/ \___/ \__|_|  |_|\___|_| .__/ \___|_|   "
-    echo "                                     | |              "
-    echo "                                     |_|              "
+
+    echo "  _____             _   _____                _           "
+    echo " |  __ \           | | |  __ \              | |          "
+    echo " | |__) |___   ___ | |_| |__) |___  __ _  __| | ___ _ __ "
+    echo " |  _  // _ \ / _ \| __|  _  // _ \/ _\` |/ _\` |/ _ \ '__|"
+    echo " | | \ \ (_) | (_) | |_| | \ \  __/ (_| | (_| |  __/ |   "
+    echo " |_|  \_\___/ \___/ \__|_|  \_\___|\__,_|\__,_|\___|_|   "
+    echo "                                                         "
+    echo "                                                         "
 
     echo "This tool helps you to start your prefered ROOT reading analysis."
 
@@ -429,6 +430,8 @@ saveConfig() {
     echo "$useCalibValues" >>"$destdir"
     echo "$useExistingRunList" >>"$destdir"
     echo "$automaticConfig" >>"$destdir"
+    echo "$automaticWindow" >>"$destdir"
+
     echo "config saved!"
 
 }
@@ -474,6 +477,7 @@ loadConfig() {
         useCalibValues=$(awk 'NR == 8' config.txt)
         useExistingRunList=$(awk 'NR == 9' config.txt)
         automaticConfig=$(awk 'NR == 10' config.txt)
+        automaticWindow=$(awk 'NR == 11' config.txt)
         echo "config loaded!"
     else
         echo "config file not found! Save a config first!"
@@ -500,7 +504,6 @@ startAutomaticEffRun() {
             echo "Location of the Integration Scripts $iwScriptDir"
             echo "Location of the Rootfile Folder  $rootfileFolderDir"
 
-
             echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
             echo "Yes -> starts automatic Baseline File creation"
             select yn in "Create" "Copy" "Continue"; do
@@ -521,9 +524,7 @@ startAutomaticEffRun() {
                     ;;
                 esac
             done
-           
 
-            
             echo "Calculating the Integration windows by the sum Histograms (Check the histograms)"
             ($iwScriptDir/IntegrationWindowAnalysis.sh)
             echo "Done Integration Window Script! "
@@ -558,13 +559,10 @@ startAutomaticEffRun() {
             dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
 
             rootfileFolderDir=$analysisPath/rootfiles
-            savedRunNumber=("${runNumber[@]}")  
+            savedRunNumber=("${runNumber[@]}")
 
             unset runNumber
-            runNumber=("${runNumberDC[@]}")  
- 
-
-
+            runNumber=("${runNumberDC[@]}")
 
             for wRun in "${savedRunNumber[@]}"; do
                 #find runname
@@ -588,8 +586,8 @@ startAutomaticEffRun() {
                 fi
 
             done
-            runNumber=("${savedRunNumber[@]}")  
-             echo "Done with the automatic efficiency run!"
+            runNumber=("${savedRunNumber[@]}")
+            echo "Done with the automatic efficiency run!"
 
             break
             ;;
@@ -606,11 +604,11 @@ startAutomaticDCRun() {
     rootfileFolderDir=$analysisPath/rootfiles
 
     echo "Using runs: ${runNumber[*]}"
-    savedRunNumber=("${runNumber[@]}")  
+    savedRunNumber=("${runNumber[@]}")
     unset runNumber
     echo "Select DC Run:"
     read runNumber
-                   
+
     for wRun in "${savedRunNumber[@]}"; do
         #find runname
         aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
@@ -632,7 +630,7 @@ startAutomaticDCRun() {
         fi
 
     done
-    runNumber=("${savedUunNumber[@]}")  
+    runNumber=("${savedUunNumber[@]}")
 
     #python $dcScriptDir/DCProbability.py
 
@@ -839,7 +837,7 @@ src=$here/src/
 inFolder=$here/data
 outFolder=$here/runs
 shouldCompile=true
-automaticConfig=false
+automaticConfig=true
 threads=6
 runNumber=a
 headerSize=a
@@ -959,7 +957,7 @@ while true; do
                         fi
                         break
                         ;;
-                    "Use Constant Calibration Values ($useCalibValues)")
+                    "Calibrate Measurement ($useCalibValues)")
                         if [ "$useCalibValues" = "0" ]; then
                             useCalibValues="1"
                         else
@@ -970,7 +968,7 @@ while true; do
 
                     "Calibration/Baseline")
                         while true; do
-                            select yn in "Is Dark Count Measurement ($isDC)" "Dynamic Baseline ($dynamicBL)" "Use Constant Calibration Values ($useCalibValues)" "<- Back"; do
+                            select yn in "Is Dark Count Measurement ($isDC)" "Dynamic Baseline ($dynamicBL)" "Calibrate Measurement ($useCalibValues)" "<- Back"; do
                                 case $yn in
 
                                 \
@@ -994,7 +992,7 @@ while true; do
                                     fi
                                     break
                                     ;;
-                                "Use Constant Calibration Values ($useCalibValues)")
+                                "Calibrate Measurement ($useCalibValues)")
                                     if [ "$useCalibValues" = "0" ]; then
                                         useCalibValues="1"
                                     else
