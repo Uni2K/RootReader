@@ -2,7 +2,7 @@
 
  
 This helps you to read in WaveCatcher binary files and convert them to .root files.
-For more informations see the Github Wiki.
+For more informations see the Github Wiki: https://github.com/Uni2K/RootReader/wiki/Introduction
   
 ![Demo](demo.PNG)
 
