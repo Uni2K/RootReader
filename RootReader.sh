@@ -501,6 +501,10 @@ startAutomaticEffRun() {
             read runNumberDC
             iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
             rootfileFolderDir=$analysisPath/rootfiles
+            rootfileFolderDirFinished=$analysisPath/finishedRootfiles
+            
+            mkdir -p $rootfileFolderDirFinished;
+
             echo "Location of the Integration Scripts $iwScriptDir"
             echo "Location of the Rootfile Folder  $rootfileFolderDir"
 
@@ -551,10 +555,11 @@ startAutomaticEffRun() {
             start
             echo "Moving IW files..."
             for n in ${runNumber[@]}; do
-                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} "$rootfileFolderDirFinished" \;
+                find $rootfileFolderDir -type f -name "${n}_*" -a -name '*.root' -exec rm -rf {} \;
             done
 
-            echo "Automatic Integration Done"
+            echo "Automatic Integration Done! Moved files to $rootfileFolderDirFinished"
 
             dcScriptDir=$(find $analysisPath -name 'DCProbability.py' -printf "%h\n")
 
@@ -609,6 +614,8 @@ startAutomaticDCRun() {
     echo "Select DC Run:"
     read runNumber
 
+    useCalibValues="1"
+
     for wRun in "${savedRunNumber[@]}"; do
         #find runname
         aRunName=$(grep -I "IW_${wRun}_" ./src/IntegrationWindows.txt | tail -1 | cut -f1 -d"=")
@@ -619,7 +626,7 @@ startAutomaticDCRun() {
         echo "DEBUG: $runNumber    ${savedRunNumber[*]}"
         start
         echo "Moving files..."
-
+        shouldCompile=false
         suffix="iw$wRun"
         path=$(find . -type f -name "${runNumber}_dc*" -a -name '*.root')
         echo "path: $path"
@@ -707,7 +714,9 @@ startAutomaticIntegration() {
 
             iwScriptDir=$(find $analysisPath -name 'IntegrationWindowAnalysis.sh' -printf "%h\n")
             rootfileFolderDir=$analysisPath/rootfiles
+            rootfileFolderDirFinished=$analysisPath/finishedRootfiles
 
+            mkdir -p $rootfileFolderDirFinished;
             echo "Make sure there are already the correct rootfiles in the analysis/rootfiles folder or press copy to move them from the runfolder to /rootfiles!"
             echo "Yes -> starts automatic Baseline File creation"
             select yn in "Create" "Copy" "Continue"; do
@@ -758,10 +767,12 @@ startAutomaticIntegration() {
             start
             echo "Moving files..."
             for n in ${runNumber[@]}; do
-                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} $rootfileFolderDir \;
+                find . -type f -name "${n}_*" -a -name '*.root' -exec cp {} "$rootfileFolderDirFinished" \;
+                find $rootfileFolderDir -type f -name "${n}_*" -a -name '*.root' -exec rm -rf {} \;
             done
 
-            echo "Automatic Integration Done"
+
+            echo "Automatic Integration Done! Moved to: $rootfileFolderDirFinished"
 
             break
             ;;

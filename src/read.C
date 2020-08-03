@@ -114,7 +114,7 @@ int skippedCount = 0;
 bool allowBaselineEventSkipping = false;
 int skipInChannel = 0;
 //Skip events that exceed the WC maximum, does not include TriggerChannel
-bool allowExceedingEventSkipping = true;
+bool allowExceedingEventSkipping =true;
 int exceedingThreshold = 600;
 //Skip veto events -> if channel sees something-> Skip
 bool allowVetoSkipping = false;
@@ -267,7 +267,7 @@ void read(map<string, string> readParameters)
   gStyle->SetLineScalePS(1); // export high resolution plots
 
   Int_t ChannelNr[runChannelNumberWC];
-  int WOMID[runChannelNumberWC];      //1=A, 2=B, 3=C, 4=D
+  int WOMID[runChannelNumberWC];      //0=A, 1=B, 2=C, 3=D
   float chPE[runChannelNumberWC];     // single channel amplitude at sum signal
   float chPE_int[runChannelNumberWC]; // single channel integral
   std::vector<float> max(runChannelNumberWC, -999);
@@ -435,6 +435,7 @@ void read(map<string, string> readParameters)
   tree->Branch("FirstCellToPlotsamIndex", FirstCellToPlotsamIndex, "FirstCellToPlotsamIndex[nCh]/I");
 
   tree->Branch("nSkipped", skippedCount, "nSkipped/I");
+
 
   /***
  *     __   ___       __          __      __  ___       __  ___ 
@@ -794,6 +795,20 @@ void read(map<string, string> readParameters)
         if (!enableBaselineCorrection)
           BL_shift = 0;
 
+        //Baseline Correction
+
+          TF1 *f_const = new TF1("f_const", "pol0", 0, 320);
+          f_const->SetParameter(0, BL_shift);
+          hCh.Add(f_const, -1);  //this = this + c1*h1
+          
+
+
+
+
+
+
+
+
         /***
  *    ___                 __      __     __         __  
  *     |  |  |\/| | |\ | / _`    /__` | |__)  |\/| /__` 
@@ -821,6 +836,7 @@ void read(map<string, string> readParameters)
  *    | | \|  |  |___ \__> |  \ /~~\ |___    |    /~~\  |  | |    |___ |  |  \__/ |__/ |___ 
  *                                           |                                              
  */
+         hCh.SetStats(0);
 
         float t_amp = t_max_inRange(&hCh, integralStart, integralEnd);
         int integrationLeftOffset = 20;
@@ -844,10 +860,9 @@ void read(map<string, string> readParameters)
         float integralEndShiftedAll = t_amp + integrationWindowsEntireSignal[i];
 
         int shiftedIndex = i + 0 * 8; //calib values are ordered D C A B; if one wants to measure data taken with SIPM A -> Shift index by 2*8
-        if (shiftedIndex == 32)
-          shiftedIndex = 31;
+        if (shiftedIndex == 32) shiftedIndex = 31;
 
-        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, BL_shift);
+        Amplitude[i] = AmplitudeHist(&hCh, integralStartShifted, integralEndShifted, 0);
 
         float calibrationError = calibrationChargeErrors[shiftedIndex];
         float correctionValueError = correctionValueErrors[shiftedIndex];
@@ -855,13 +870,19 @@ void read(map<string, string> readParameters)
         float effectivFactor = correctionValues[shiftedIndex] / calibrationCharges.at(shiftedIndex);
         float effectivFactorError = sqrt(pow((correctionValueError / calibrationCharges.at(shiftedIndex)), 2) + pow((correctionValues[shiftedIndex] * calibrationError / pow(calibrationCharges.at(shiftedIndex), 2)), 2));
 
-        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * effectivFactor;
-        IntegralErrorP[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor + effectivFactorError);
-        IntegralErrorM[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, BL_shift) * (effectivFactor - effectivFactorError);
 
-        IntegralDiff[i] = IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], BL_shift);
+    
+        Integral[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, 0) * effectivFactor;
       
+      IntegralErrorP[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, 0) * (effectivFactor + effectivFactorError);
+      IntegralErrorM[i] = IntegralHist(&hCh, integralStartShifted, integralEndShifted, 0) * (effectivFactor - effectivFactorError);
+      IntegralDiff[i]   =   IntegralDifference(&hCh, integralStartShifted, integralEndShifted, integralEndShiftedAll, Amplitude[shiftedIndex], 0);
+
       
+
+      
+
+
        /* if (i ==14 || i==15)
         {
           float pe = hCh.GetMinimum();
@@ -886,9 +907,14 @@ void read(map<string, string> readParameters)
           }
         }
 
+
+ 
+         // cout<<"DD: "<<IntegralDiff[i]<<"  "<<i<<endl;
+         // skipThisEvent=true;
+
         if (WOMID[i] >= 0)
           histChannelSumWOM[WOMID[i]]->Add(&hCh);
-
+  
         /***
  *     __   __         ___         __                     ___  __  
  *    |__) |__) | |\ |  |  | |\ | / _`    |  |  /\  \  / |__  /__` 
@@ -910,6 +936,9 @@ void read(map<string, string> readParameters)
             if (zoomedInWaves)
               hCh.GetXaxis()->SetRange((integralStartShifted - 50) / SP, (integralEndShiftedAll + 50) / SP);
 
+
+            if(i==8)hCh.GetXaxis()->SetRange(0,150.0/SP);
+
             hCh.DrawCopy("HIST"); //No error bars pls
             hCh.GetXaxis()->SetRange((t[i] - 20) / SP, (t[i] + 30) / SP);
             int max_bin = hCh.GetMaximumBin();
@@ -920,11 +949,13 @@ void read(map<string, string> readParameters)
             float lower_time = hCh.GetXaxis()->GetBinCenter(lower_bin);
             float upper_time = hCh.GetXaxis()->GetBinCenter(upper_bin);
             hCh.GetXaxis()->SetRange(0, 1024);
-            TLine *ln4 = new TLine(0, BL_lower[i], 75, BL_lower[i]);
-            TLine *ln5 = new TLine(270, BL_upper[i], 320, BL_upper[i]);
-            TText *text = new TText(.5, .5, Form("%f %f", BL_lower[i], BL_upper[i]));
+            TLine *ln4 = new TLine(0, BL_lower[i], 30, BL_lower[i]);
+            TLine *ln5 = new TLine(290, BL_upper[i], 320, BL_upper[i]);
+            TText *text = new TText(.5, .5, Form("%f | %f", BL_lower[i], BL_upper[i]));
             ln4->SetLineColor(2);
             ln5->SetLineColor(2);
+            ln4->SetLineWidth(3);
+            ln5->SetLineWidth(3);
 
             TLine *baselineUsed = new TLine(0, BL_shift, 320, BL_shift);
             baselineUsed->SetLineColor(3);
@@ -940,18 +971,22 @@ void read(map<string, string> readParameters)
             rightInterval = new TLine(integralEndShifted, minY, integralEndShifted, maxY);
             endInterval = new TLine(integralEndShiftedAll, minY, integralEndShiftedAll, maxY);
 
+            leftInterval->SetLineWidth(3);
+            rightInterval->SetLineWidth(3);
+            endInterval->SetLineWidth(3);
+
             leftInterval->SetLineColor(2);
             rightInterval->SetLineColor(2);
+            endInterval->SetLineColor(2);
 
-            baselineUsed->Draw("same");
+           baselineUsed->Draw("same");
             ln4->Draw("same");
             ln5->Draw("same");
 
             leftInterval->Draw("same");
             rightInterval->Draw("same");
             endInterval->Draw("same");
-            TLegend *h_leg = new TLegend(0.62, 0.67, 1, 1);
-
+            TLegend *h_leg = new TLegend(0.50, 0.65, 0.88, 0.88);
             bool lightMode = false;
             if (allowVetoSkipping && i == vetoChannel)
             {
@@ -962,7 +997,7 @@ void read(map<string, string> readParameters)
 
             }
 
-            h_leg->SetTextSize(0.015);
+            h_leg->SetTextSize(0.020);
             if (allowForcePrintEvents)
               h_leg->AddEntry((TObject *)0, Form("ForcePrinted: %d, Count: %d, Skip: %d", forcePrintThisEvent, forcePrintEvents, skipThisEvent), "");
             h_leg->AddEntry((TObject *)0, Form("Integral: %1.2f /ErrP(%1.2f)/ErrM(%1.2f)", Integral[i], IntegralErrorP[i], IntegralErrorM[i]), "");
@@ -978,9 +1013,22 @@ void read(map<string, string> readParameters)
               h_leg->AddEntry((TObject *)0, Form("PWindowSize: %1.2f", abs(integralStartShifted - integralEndShifted)), "");
             }
            
-            h_leg->Draw();
+          // h_leg->Clear();
+           /*h_leg->AddEntry(ln4, Form("baseline start: %1.2f mV",  BL_lower[i]), "l");
+            h_leg->AddEntry((TObject *)0, Form("reduced chi^{2}: %1.2f",  BL_Chi2_lower[i]), "");
+           h_leg->AddEntry((TObject *)0, "", "");
 
-            text->Draw("same");
+           h_leg->AddEntry(ln5, Form("baseline end: %1.2f mV",  BL_upper[i]), "l");
+          h_leg->AddEntry((TObject *)0, Form("reduced chi^{2}: %1.2f",  BL_Chi2_upper[i]), "");*/
+         // h_leg->AddEntry((TObject *)0, Form("position: %d",  runPosition), "");
+          //h_leg->AddEntry((TObject *)0, Form("energy: %1.1f GeV",  runEnergy*0.1), "");
+          //h_leg->AddEntry((TObject *)0, Form("box rotation: %d deg",  runAngle), "");
+          //h_leg->AddEntry((TObject *)0, "WOM: D", "");
+        //  h_leg->AddEntry((TObject *)0, Form("f_W: %1.2f", IntegralDiff[i]), "");
+
+           h_leg->Draw();
+
+            //text->Draw("same");
           }
           hCh.GetXaxis()->SetRange(1, 30 / SP);
           noiseLevel[i] = hCh.GetMaximum() - hCh.GetMinimum();
@@ -988,14 +1036,18 @@ void read(map<string, string> readParameters)
           // End of loop over inividual channels
         }
 
-        if (!skipThisEvent && print)
-        {
-          TF1 *f_const = new TF1("f_const", "pol0", 0, 320);
-          f_const->SetParameter(0, BL_shift);
-          hCh.Add(f_const, -1);
-          hChSum.at(i)->Add(&hCh, 1);
-        }
+       
+
+         if(IntegralDiff[i]>-88 && !skipThisEvent) 
+            hChSum.at(i)->Add(&hCh, 1); //Dont sum empty waveforms into your sum histogram
+
       }
+    
+
+    
+
+
+
 
       /***
  *          __            __              __  
@@ -1152,14 +1204,14 @@ void read(map<string, string> readParameters)
     for (int i = 0; i < runChannelNumberWC; i++)
     {
       cChSum.cd(i + 1);
-      hChSum.at(i)->GetXaxis()->SetRange(100,250);
+     // hChSum.at(i)->GetXaxis()->SetRange(100,250);
       hChSum.at(i)->GetXaxis()->SetLabelSize(0.04);
       hChSum.at(i)->GetYaxis()->SetLabelSize(0.04);
 
        hChSum.at(i)->SetStats(0);
 
       hChSum.at(i)->Draw("HIST");
-      hChSum.at(i)->SetFillColorAlpha(4, 0.8);
+   //   hChSum.at(i)->SetFillColorAlpha(4, 0.8);
     }
     cChSum.Print((TString)(plotSaveFolder + "/ChSum.pdf"), "pdf");
   }

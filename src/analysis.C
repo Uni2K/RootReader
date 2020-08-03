@@ -164,7 +164,7 @@ float IntegralHistCFD(TH1F *hWave, float threshold, float windowInNs, float BL)
 
 float IntegralDifference(TH1F *hWave, float leftStart, float rightEnd, float rightEndAll, float Amplitude, float BL)
 {
-  if (Amplitude < 10)
+ if (Amplitude < 8)
   {
     return -100;
   }
