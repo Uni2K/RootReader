@@ -638,6 +638,7 @@ startAutomaticDCRun() {
 
     done
     runNumber=("${savedUunNumber[@]}")
+    automaticWindow=true
 
     #python $dcScriptDir/DCProbability.py
 
