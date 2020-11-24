@@ -46,9 +46,8 @@ float pe = 47.46;  //mV*ns
 
 vector<float> calibrationCharges = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};      // dummy
 vector<float> calibrationChargeErrors = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // dummy
-string calibrationRunName = "7_calib_vb58_tune8700_pcbd";
-string dcIntegrationWindow = "7_calib_vb58_tune8700_pcbd";
-//string dcIntegrationWindow="24_pos7_angle0_e14_ch32";
+string calibrationRunName = ""; //7_calib_vb58_tune8700_pcbd
+string dcIntegrationWindow = "";
 
 vector<float> BL_const = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                       // dummy
 vector<float> integrationWindowsEntireSignal = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // dummy , left is always -20 measured to the max
@@ -64,7 +63,7 @@ Int_t runPosition = -999;
 Float_t runEnergy = -999;
 Int_t runAngle = -999;
 Int_t runNumber = -999;
-Int_t runChannelNumberWC = 16;
+Int_t runChannelNumberWC = 32; //maximum
 /*Declare & define the variables that are to be saved in the root-tree or that are used during the analysis.*/
 Int_t EventNumber = -999;
 Int_t LastEventNumber = -999;
@@ -640,6 +639,7 @@ void read(map<string, string> readParameters)
 
       /*Loop over individual channels. For each event the data from every channel is 
       processed and analysed one by one in order*/
+
       for (int i = 0; i < nCh; i++)
       {
         nitem = fread(&ChannelNr[i], sizeof(int), 1, pFILE);

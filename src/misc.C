@@ -160,7 +160,9 @@ pair<vector<float>,vector<float>> readPair(string path, string _runName, double 
     peakSignals.push_back(initValueFirst);
     allSignals.push_back(initValueSecond);
 
-  }
+  }     
+  
+
 
   return pair<vector<float>,vector<float>>(peakSignals,allSignals);
 }
