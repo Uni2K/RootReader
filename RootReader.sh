@@ -27,7 +27,12 @@ showInformation() {
     echo " | | \ \ (_) | (_) | |_| | \ \  __/ (_| | (_| |  __/ |   "
     echo " |_|  \_\___/ \___/ \__|_|  \_\___|\__,_|\__,_|\___|_|   "
     echo "                                                         "
+echo "   _   _   _   _   _     _   _   _   _   _   _   _  ";
+echo "  / \ / \ / \ / \ / \   / \ / \ / \ / \ / \ / \ / \ ";
+echo " ( F | i | n | a | l ) ( V | e | r | s | i | o | n )";
+echo "  \_/ \_/ \_/ \_/ \_/   \_/ \_/ \_/ \_/ \_/ \_/ \_/ ";
     echo "                                                         "
+
 
     echo "This tool helps you to start your prefered ROOT reading analysis."
 
@@ -264,9 +269,9 @@ merger() {
     ./src/mergeROOTFiles $rootFileList $2 $3
 
     #merge PDF Waves.pdf
-    pdfunite $(find $2 -name "*waves.pdf") $2/waves.pdf
-    pdfunite $(find $2 -name "*ChSum.pdf") $2/ChSum.pdf
-    pdfunite $(find $2 -name "*womSum.pdf") $2/womSum.pdf
+    pdfunite $(find $2 -name "*waveforms.pdf") $2/waveforms.pdf
+    pdfunite $(find $2 -name "*waveforms_chSum.pdf") $2/waveforms_chSum.pdf
+    pdfunite $(find $2 -name "*waveforms_womSum.pdf") $2/waveforms_womSum.pdf
 
 }
 
